@@ -7,6 +7,10 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+// Supabase configuration for internal function calls
+const SUPABASE_URL = Deno.env.get('SUPABASE_URL') || 'https://ghpyultwdcrdduksujxi.supabase.co';
+const SUPABASE_ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY') || Deno.env.get('VITE_SUPABASE_PUBLISHABLE_KEY');
+
 // Part 1: Q&A Knowledge Base Corpus
 const knowledgeBaseQA = `### [LLM_Knowledge_Base_Part_1_of_2_QA_Corpus]
 
@@ -283,16 +287,41 @@ serve(async (req) => {
           // Plain text file - use directly
           extractedText = file.data;
           console.log(`Text file processed: ${file.name}`);
-        } else if (file.type.startsWith("image/")) {
-          // Image file - use vision API for OCR
-          // Vision API disabled for free tier migration
-          console.log(`Vision API skipped for ${file.name} (Free Tier limitation)`);
-          extractedText = `[Image content from ${file.name} - Vision API not available in free tier]`;
-        } else if (file.type === "application/pdf") {
-          // PDF file - use vision API to extract text
-          // Since we don't have a PDF parser, we'll use vision API on the PDF
-          extractedText = `[PDF Content from ${file.name} - Please convert to text or images for better extraction]`;
-          console.log(`PDF file noted: ${file.name}`);
+        } else if (file.type.startsWith("image/") || file.type === "application/pdf") {
+          // Image or PDF file - use Azure Document Intelligence OCR
+          try {
+            console.log(`Starting OCR for ${file.name}...`);
+
+            // Call the OCR Edge Function
+            const ocrResponse = await fetch(`${SUPABASE_URL}/functions/v1/process-document-ocr`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+              },
+              body: JSON.stringify({
+                imageData: file.data,
+                imageType: file.type,
+                fileName: file.name,
+              }),
+            });
+
+            if (!ocrResponse.ok) {
+              throw new Error(`OCR request failed: ${ocrResponse.status}`);
+            }
+
+            const ocrResult = await ocrResponse.json();
+
+            if (ocrResult.success) {
+              extractedText = ocrResult.markdown;
+              console.log(`OCR completed for ${file.name}, extracted ${extractedText.length} characters`);
+            } else {
+              throw new Error(ocrResult.error || 'OCR extraction failed');
+            }
+          } catch (ocrError) {
+            console.error(`OCR error for ${file.name}:`, ocrError);
+            extractedText = `[OCR failed for ${file.name}: ${ocrError.message}]`;
+          }
         } else if (
           file.type.includes("spreadsheet") ||
           file.type.includes("excel") ||
