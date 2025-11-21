@@ -5,7 +5,7 @@
 This project is a vendor-agnostic implementation of SR&ED GPT, featuring:
 - **Frontend**: React + Vite (deployed on Vercel)
 - **Backend**: Supabase
-- **AI**: Open-source LLM (DeepSeek-R1-Distill-Qwen-1.5B) hosted on Hugging Face Spaces
+- **AI**: Open-source LLM (Phi-3.5) hosted on Hugging Face Spaces
 
 ## Getting Started
 
