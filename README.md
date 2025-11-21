@@ -17,8 +17,8 @@ This project is a vendor-agnostic implementation of SR&ED GPT, featuring:
 
 1. Clone the repository:
    ```sh
-   git clone <YOUR_GIT_URL>
-   cd <YOUR_PROJECT_NAME>
+   git clone https://github.com/TomCruiseTorpedo/rambo2
+   cd rambo2
    ```
 
 2. Install dependencies:
