@@ -262,7 +262,7 @@ serve(async (req) => {
       deviceType,
     });
 
-    const LLM_API_URL = Deno.env.get("LLM_API_URL") || "https://api-inference.huggingface.co/models/deepseek-ai/DeepSeek-R1-Distill-Qwen-1.5B";
+    const LLM_API_URL = Deno.env.get("LLM_API_URL") || "https://tomcruisemissile-rambo2.hf.space";
     const LLM_API_KEY = Deno.env.get("LLM_API_KEY") || "dummy-key"; // Optional, depending on host
 
     const sourceTexts: string[] = [];
