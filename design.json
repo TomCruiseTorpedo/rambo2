@@ -1,0 +1,520 @@
+{
+  "designSystem": {
+    "name": "Modern Dashboard Design System",
+    "version": "1.0.0",
+    "description": "A clean, professional dashboard design system with emphasis on data visualization and user-friendly interfaces",
+    
+    "designPrinciples": {
+      "clarity": "Prioritize clear information hierarchy and readability",
+      "consistency": "Maintain consistent patterns across all components and interactions",
+      "efficiency": "Design for quick scanning and efficient task completion",
+      "professionalism": "Present data in a business-appropriate, trustworthy manner",
+      "accessibility": "Ensure adequate contrast and interactive element sizing"
+    },
+
+    "colors": {
+      "primary": {
+        "main": "#4F46E5",
+        "light": "#818CF8",
+        "dark": "#3730A3",
+        "description": "Primary brand color used for active states, primary actions, and key highlights"
+      },
+      "success": {
+        "main": "#10B981",
+        "light": "#D1FAE5",
+        "text": "#059669",
+        "description": "Used for positive indicators like 'Paid' status, success messages, and positive metrics"
+      },
+      "warning": {
+        "main": "#F59E0B",
+        "light": "#FEF3C7",
+        "text": "#D97706",
+        "description": "Used for attention-needed states like 'Ready' status and warning messages"
+      },
+      "info": {
+        "main": "#3B82F6",
+        "light": "#DBEAFE",
+        "text": "#2563EB",
+        "description": "Used for informational states like 'Received' status"
+      },
+      "neutral": {
+        "main": "#6B7280",
+        "light": "#F3F4F6",
+        "dark": "#374151",
+        "description": "Used for 'Shipped' status and general neutral states"
+      },
+      "background": {
+        "primary": "#FFFFFF",
+        "secondary": "#F9FAFB",
+        "sidebar": "#F3F4F6",
+        "description": "Background colors for different surface levels"
+      },
+      "text": {
+        "primary": "#111827",
+        "secondary": "#6B7280",
+        "disabled": "#9CA3AF",
+        "inverted": "#FFFFFF",
+        "description": "Text colors for different hierarchies"
+      },
+      "border": {
+        "light": "#E5E7EB",
+        "default": "#D1D5DB",
+        "strong": "#9CA3AF",
+        "description": "Border colors for various emphasis levels"
+      },
+      "chart": {
+        "primary": "#4F46E5",
+        "secondary": "#D1D5DB",
+        "accent": "#10B981",
+        "description": "Colors specifically for data visualization"
+      }
+    },
+
+    "typography": {
+      "fontFamily": {
+        "primary": "Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
+        "monospace": "'Fira Code', 'Courier New', monospace",
+        "description": "Use Inter for all UI elements, monospace for code or data"
+      },
+      "fontSize": {
+        "xs": "12px",
+        "sm": "14px",
+        "base": "16px",
+        "lg": "18px",
+        "xl": "20px",
+        "2xl": "24px",
+        "3xl": "30px",
+        "4xl": "36px",
+        "description": "Follow a consistent type scale"
+      },
+      "fontWeight": {
+        "normal": 400,
+        "medium": 500,
+        "semibold": 600,
+        "bold": 700,
+        "description": "Use medium for subtle emphasis, semibold for headings, bold sparingly"
+      },
+      "lineHeight": {
+        "tight": 1.25,
+        "normal": 1.5,
+        "relaxed": 1.75,
+        "description": "Tighter for headings, normal for body, relaxed for long-form content"
+      },
+      "hierarchy": {
+        "h1": {
+          "size": "30px",
+          "weight": 700,
+          "lineHeight": 1.25,
+          "usage": "Page titles"
+        },
+        "h2": {
+          "size": "24px",
+          "weight": 600,
+          "lineHeight": 1.3,
+          "usage": "Section headings"
+        },
+        "h3": {
+          "size": "20px",
+          "weight": 600,
+          "lineHeight": 1.4,
+          "usage": "Card titles, subsection headings"
+        },
+        "body": {
+          "size": "14px",
+          "weight": 400,
+          "lineHeight": 1.5,
+          "usage": "Primary content text"
+        },
+        "caption": {
+          "size": "12px",
+          "weight": 400,
+          "lineHeight": 1.5,
+          "usage": "Helper text, labels, metadata"
+        }
+      }
+    },
+
+    "spacing": {
+      "scale": "Based on 8px grid system",
+      "values": {
+        "xs": "4px",
+        "sm": "8px",
+        "md": "16px",
+        "lg": "24px",
+        "xl": "32px",
+        "2xl": "48px",
+        "3xl": "64px"
+      },
+      "component": {
+        "padding": {
+          "card": "24px",
+          "button": "12px 24px",
+          "input": "12px 16px",
+          "badge": "4px 12px"
+        },
+        "gap": {
+          "tight": "8px",
+          "normal": "16px",
+          "loose": "24px"
+        }
+      },
+      "layout": {
+        "sidebarWidth": "200px",
+        "contentMaxWidth": "1400px",
+        "contentPadding": "24px"
+      }
+    },
+
+    "borderRadius": {
+      "none": "0px",
+      "sm": "4px",
+      "md": "8px",
+      "lg": "12px",
+      "xl": "16px",
+      "full": "9999px",
+      "usage": {
+        "cards": "8px - 12px for main content cards",
+        "buttons": "8px for standard buttons",
+        "badges": "6px for status badges",
+        "inputs": "8px for form inputs",
+        "avatars": "full for circular avatars"
+      }
+    },
+
+    "shadows": {
+      "none": "none",
+      "sm": "0 1px 2px 0 rgba(0, 0, 0, 0.05)",
+      "md": "0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)",
+      "lg": "0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)",
+      "xl": "0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)",
+      "usage": {
+        "cards": "md - subtle elevation for content cards",
+        "modals": "xl - prominent elevation for overlays",
+        "dropdowns": "lg - clear separation for menus",
+        "buttons": "sm on hover for interactive feedback"
+      }
+    },
+
+    "components": {
+      "cards": {
+        "description": "Primary content containers",
+        "variants": {
+          "default": {
+            "background": "white",
+            "border": "1px solid #E5E7EB",
+            "borderRadius": "12px",
+            "padding": "24px",
+            "shadow": "sm"
+          },
+          "stat": {
+            "background": "white",
+            "border": "none",
+            "borderRadius": "12px",
+            "padding": "24px",
+            "shadow": "md",
+            "features": ["Icon in brand color", "Large number display", "Percentage change indicator"]
+          },
+          "interactive": {
+            "hover": "Subtle background color change on hover",
+            "cursor": "pointer",
+            "transition": "all 0.2s ease"
+          }
+        }
+      },
+
+      "buttons": {
+        "description": "Action triggers with clear visual hierarchy",
+        "variants": {
+          "primary": {
+            "background": "#4F46E5",
+            "color": "white",
+            "borderRadius": "8px",
+            "padding": "12px 24px",
+            "fontWeight": 600,
+            "hover": "Darken background by 10%",
+            "usage": "Main call-to-action buttons"
+          },
+          "secondary": {
+            "background": "white",
+            "color": "#4F46E5",
+            "border": "1px solid #4F46E5",
+            "borderRadius": "8px",
+            "padding": "12px 24px",
+            "fontWeight": 600,
+            "hover": "Light blue background",
+            "usage": "Secondary actions like 'Export'"
+          },
+          "ghost": {
+            "background": "transparent",
+            "color": "#6B7280",
+            "border": "none",
+            "hover": "Light gray background",
+            "usage": "Tertiary actions"
+          }
+        },
+        "sizing": {
+          "sm": "8px 16px, text 14px",
+          "md": "12px 24px, text 16px",
+          "lg": "16px 32px, text 18px"
+        }
+      },
+
+      "badges": {
+        "description": "Status indicators with color-coded meanings",
+        "variants": {
+          "paid": {
+            "background": "#D1FAE5",
+            "color": "#059669",
+            "fontSize": "12px",
+            "padding": "4px 12px",
+            "borderRadius": "6px",
+            "fontWeight": 500
+          },
+          "pending": {
+            "background": "#E0E7FF",
+            "color": "#4F46E5",
+            "fontSize": "12px",
+            "padding": "4px 12px",
+            "borderRadius": "6px",
+            "fontWeight": 500
+          },
+          "ready": {
+            "background": "#FEF3C7",
+            "color": "#D97706",
+            "fontSize": "12px",
+            "padding": "4px 12px",
+            "borderRadius": "6px",
+            "fontWeight": 500
+          },
+          "shipped": {
+            "background": "#E5E7EB",
+            "color": "#374151",
+            "fontSize": "12px",
+            "padding": "4px 12px",
+            "borderRadius": "6px",
+            "fontWeight": 500
+          },
+          "received": {
+            "background": "#DBEAFE",
+            "color": "#2563EB",
+            "fontSize": "12px",
+            "padding": "4px 12px",
+            "borderRadius": "6px",
+            "fontWeight": 500
+          }
+        }
+      },
+
+      "navigation": {
+        "sidebar": {
+          "width": "200px",
+          "background": "#F3F4F6",
+          "padding": "16px",
+          "items": {
+            "default": {
+              "padding": "12px 16px",
+              "borderRadius": "8px",
+              "color": "#6B7280",
+              "icon": "20px, same color as text",
+              "hover": "Light gray background"
+            },
+            "active": {
+              "background": "#4F46E5",
+              "color": "white",
+              "fontWeight": 500
+            }
+          },
+          "groups": {
+            "label": {
+              "fontSize": "12px",
+              "color": "#9CA3AF",
+              "textTransform": "uppercase",
+              "fontWeight": 600,
+              "marginTop": "24px",
+              "marginBottom": "8px"
+            }
+          }
+        }
+      },
+
+      "tables": {
+        "description": "Data display with clear hierarchy and status indicators",
+        "header": {
+          "background": "#F9FAFB",
+          "color": "#6B7280",
+          "fontSize": "12px",
+          "fontWeight": 600,
+          "padding": "12px 16px",
+          "textTransform": "uppercase",
+          "letterSpacing": "0.5px"
+        },
+        "row": {
+          "background": "white",
+          "padding": "16px",
+          "borderBottom": "1px solid #E5E7EB",
+          "hover": "Light gray background (#F9FAFB)"
+        },
+        "cell": {
+          "fontSize": "14px",
+          "color": "#111827",
+          "padding": "16px"
+        },
+        "features": [
+          "Checkbox column for selection",
+          "Sortable headers with icons",
+          "Status badges in appropriate columns",
+          "Hover states for entire rows"
+        ]
+      },
+
+      "forms": {
+        "inputs": {
+          "default": {
+            "background": "white",
+            "border": "1px solid #D1D5DB",
+            "borderRadius": "8px",
+            "padding": "12px 16px",
+            "fontSize": "14px",
+            "placeholder": "#9CA3AF",
+            "focus": "Blue border (#4F46E5), remove outline"
+          },
+          "search": {
+            "icon": "Search icon on left, 16px",
+            "iconColor": "#9CA3AF",
+            "padding": "12px 16px 12px 40px"
+          }
+        },
+        "select": {
+          "appearance": "Custom dropdown with chevron icon",
+          "styling": "Same as input with dropdown indicator"
+        }
+      },
+
+      "charts": {
+        "description": "Clean, readable data visualizations",
+        "lineChart": {
+          "lineWidth": "2px",
+          "lineColor": "#4F46E5",
+          "secondaryLineColor": "#D1D5DB",
+          "pointRadius": "4px on hover, hidden otherwise",
+          "gridLines": "Light gray (#E5E7EB), subtle",
+          "labels": {
+            "fontSize": "12px",
+            "color": "#9CA3AF"
+          }
+        },
+        "barChart": {
+          "barColor": "#10B981",
+          "barRadius": "4px top corners",
+          "spacing": "8px between bars",
+          "gridLines": "Light gray, horizontal only"
+        }
+      },
+
+      "icons": {
+        "size": {
+          "sm": "16px",
+          "md": "20px",
+          "lg": "24px"
+        },
+        "style": "Outlined icons (not filled) for consistency",
+        "strokeWidth": "2px for balanced weight",
+        "usage": "Use icons to enhance meaning, not replace text"
+      },
+
+      "avatars": {
+        "sizing": {
+          "sm": "32px",
+          "md": "40px",
+          "lg": "48px"
+        },
+        "borderRadius": "full (circular)",
+        "border": "2px solid white when overlapping",
+        "fallback": "Initials on colored background"
+      }
+    },
+
+    "layout": {
+      "structure": {
+        "description": "Fixed sidebar with fluid main content area",
+        "sidebar": "200px fixed width, full height, gray background",
+        "header": "Full width, white background, 64px height, sticky",
+        "mainContent": "Fluid width with max-width constraint, padding around content",
+        "contentGrid": "Responsive grid system based on 12 columns"
+      },
+      "responsive": {
+        "mobile": "< 768px - Stack cards vertically, hide sidebar in drawer",
+        "tablet": "768px - 1024px - 2 column grid for cards",
+        "desktop": "> 1024px - Full multi-column layout with sidebar"
+      },
+      "gridSystem": {
+        "columns": 12,
+        "gutter": "24px",
+        "container": "Max-width 1400px, centered with horizontal padding"
+      }
+    },
+
+    "interactions": {
+      "transitions": {
+        "default": "all 0.2s ease",
+        "fast": "all 0.15s ease",
+        "slow": "all 0.3s ease",
+        "usage": "Use for hover states, color changes, and simple animations"
+      },
+      "hover": {
+        "cards": "Subtle box-shadow increase",
+        "buttons": "Background color darkens/lightens by 10%",
+        "links": "Underline appears",
+        "tableRows": "Background changes to light gray"
+      },
+      "focus": {
+        "outlineColor": "#4F46E5",
+        "outlineWidth": "2px",
+        "outlineOffset": "2px",
+        "usage": "Clear focus indicators for keyboard navigation"
+      },
+      "loading": {
+        "spinner": "Primary blue color, 24px default size",
+        "skeleton": "Animated gradient on gray background",
+        "usage": "Show loading states for async operations"
+      }
+    },
+
+    "dataVisualization": {
+      "principles": [
+        "Use color purposefully - not just for decoration",
+        "Maintain high contrast ratios for readability",
+        "Include clear labels and legends",
+        "Show trends clearly with appropriate chart types",
+        "Use consistent color meanings (green = positive, red = negative)"
+      ],
+      "metrics": {
+        "display": {
+          "primaryNumber": "Large, bold typography (30px+)",
+          "label": "Small, gray text below number",
+          "change": "Percentage with up/down arrow, colored by direction",
+          "icon": "Circular background in brand color"
+        }
+      }
+    },
+
+    "accessibility": {
+      "requirements": [
+        "Minimum contrast ratio of 4.5:1 for normal text",
+        "Minimum contrast ratio of 3:1 for large text",
+        "All interactive elements minimum 44x44px touch target",
+        "Clear focus indicators on all interactive elements",
+        "Semantic HTML structure",
+        "ARIA labels where needed",
+        "Keyboard navigation support for all interactions"
+      ]
+    },
+
+    "designTokenUsage": {
+      "implementation": "Use CSS variables or Tailwind theme extension",
+      "naming": "Follow semantic naming (primary, secondary) not descriptive (blue, red)",
+      "consistency": "Always use tokens, never hard-coded values",
+      "documentation": "Keep this design.json as single source of truth"
+    }
+  }
+}
