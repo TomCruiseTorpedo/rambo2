@@ -377,10 +377,10 @@ serve(async (req) => {
 
 async function generateNarrative(extractedText: string, apiUrl: string, apiKey: string, deviceType: string = "desktop"): Promise<string> {
   // Default to a model that works with the generic endpoint, or let the endpoint decide
-  const model = "deepseek-r1-distill-qwen-1.5b"; 
-  
+  const model = Deno.env.get("LLM_MODEL") || "phi3.5";
+
   console.log(`Using AI model: ${model} via ${apiUrl}`);
-  
+
   const userPrompt = `KNOWLEDGE BASE CONTEXT:
 ${knowledgeBaseContext}
 
@@ -475,7 +475,7 @@ APPLY THE 5 QUESTIONS:
   // Otherwise append /v1/chat/completions
   let endpoint = apiUrl;
   if (!endpoint.includes("/chat/completions")) {
-      endpoint = endpoint.replace(/\/+$/, "") + "/v1/chat/completions";
+    endpoint = endpoint.replace(/\/+$/, "") + "/v1/chat/completions";
   }
 
   console.log(`Sending request to: ${endpoint}`);

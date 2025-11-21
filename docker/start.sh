@@ -8,7 +8,7 @@ pid=$!
 sleep 5
 
 echo "🔴 Retrieving model..."
-ollama pull deepseek-r1-distill-qwen-1.5b
+ollama pull phi3.5
 echo "🟢 Model pulled successfully!"
 
 # Wait for the process to finish
