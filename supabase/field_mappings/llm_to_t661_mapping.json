@@ -1,0 +1,61 @@
+{
+    "metadata": {
+        "description": "Minimal LLM → T661 field mapping for SR&ED narrative sections",
+        "version": "1.0",
+        "total_mapped_fields": 10
+    },
+    "mappings": {
+        "claimant_info": {
+            "business_number": {
+                "description": "Business number (9 digits + RC identifier)",
+                "page": 1,
+                "field_type": "single_line",
+                "note": "Will need to find exact field ID from smart_map page_1"
+            },
+            "tax_year_from": {
+                "description": "Tax year start date",
+                "page": 1,
+                "field_id": "ffaf5c94",
+                "field_type": "single_line"
+            },
+            "tax_year_to": {
+                "description": "Tax year end date",
+                "page": 1,
+                "field_id": "42c5611f",
+                "field_type": "single_line"
+            }
+        },
+        "project_narrative": {
+            "project_title": {
+                "description": "Main project title/name",
+                "page": 2,
+                "field_type": "multi_line",
+                "note": "Large text area - find in page_2"
+            },
+            "scientific_advancement": {
+                "description": "What scientific/technological advancement was sought?",
+                "page": 3,
+                "field_type": "multi_line",
+                "max_chars": 500
+            },
+            "technological_uncertainties": {
+                "description": "What uncertainties existed?",
+                "page": 4,
+                "field_type": "multi_line",
+                "max_chars": 500
+            },
+            "work_performed": {
+                "description": "What work was performed to overcome uncertainties?",
+                "page": 5,
+                "field_type": "multi_line",
+                "max_chars": 500
+            }
+        }
+    },
+    "next_steps": [
+        "1. User: Review SR&ED T661 form to identify which fields LLM should fill",
+        "2. Agent: Match those fields to IDs in t661_smart_map.json",
+        "3. Agent: Update fill-pdf-t661 function to use smart_map coordinates",
+        "4. Test with sample LLM output"
+    ]
+}

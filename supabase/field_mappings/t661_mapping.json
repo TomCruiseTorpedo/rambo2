@@ -1,0 +1,136 @@
+{
+    "metadata": {
+        "form_name": "T661 Scientific Research and Experimental Development (SR&ED) Expenditures Claim",
+        "version": "20e",
+        "pages": 9,
+        "pdf_dimensions": {
+            "width": 612,
+            "height": 792,
+            "unit": "points"
+        }
+    },
+    "fields": {
+        "page_1_claimant_info": {
+            "claimant_name": {
+                "page": 0,
+                "x": 120,
+                "y": 720,
+                "fontSize": 10,
+                "maxWidth": 400,
+                "required": true,
+                "llm_source": "company_name"
+            },
+            "business_number": {
+                "page": 0,
+                "x": 120,
+                "y": 690,
+                "fontSize": 10,
+                "maxWidth": 200,
+                "required": true,
+                "llm_source": "business_number"
+            },
+            "tax_year_end": {
+                "page": 0,
+                "x": 350,
+                "y": 690,
+                "fontSize": 10,
+                "maxWidth": 100,
+                "required": true,
+                "llm_source": "tax_year"
+            }
+        },
+        "page_2_project_info": {
+            "project_number": {
+                "page": 1,
+                "x": 100,
+                "y": 750,
+                "fontSize": 10,
+                "maxWidth": 100,
+                "required": true,
+                "llm_source": "project_id"
+            },
+            "project_title": {
+                "page": 1,
+                "x": 100,
+                "y": 720,
+                "fontSize": 11,
+                "maxWidth": 450,
+                "required": true,
+                "llm_source": "project_title"
+            },
+            "project_description": {
+                "page": 1,
+                "x": 80,
+                "y": 650,
+                "fontSize": 9,
+                "maxWidth": 500,
+                "maxHeight": 150,
+                "multiline": true,
+                "required": true,
+                "llm_source": "project_summary"
+            }
+        },
+        "page_3_scientific_advancement": {
+            "scientific_advancement": {
+                "page": 2,
+                "x": 80,
+                "y": 650,
+                "fontSize": 9,
+                "maxWidth": 500,
+                "maxHeight": 200,
+                "multiline": true,
+                "required": true,
+                "llm_source": "scientific_advancement"
+            },
+            "base_of_knowledge": {
+                "page": 2,
+                "x": 80,
+                "y": 400,
+                "fontSize": 9,
+                "maxWidth": 500,
+                "maxHeight": 150,
+                "multiline": true,
+                "required": true,
+                "llm_source": "base_knowledge"
+            }
+        },
+        "page_4_uncertainties": {
+            "technological_uncertainties": {
+                "page": 3,
+                "x": 80,
+                "y": 650,
+                "fontSize": 9,
+                "maxWidth": 500,
+                "maxHeight": 250,
+                "multiline": true,
+                "required": true,
+                "llm_source": "uncertainties"
+            }
+        },
+        "page_5_work_performed": {
+            "work_performed": {
+                "page": 4,
+                "x": 80,
+                "y": 650,
+                "fontSize": 9,
+                "maxWidth": 500,
+                "maxHeight": 300,
+                "multiline": true,
+                "required": true,
+                "llm_source": "work_description"
+            }
+        }
+    },
+    "notes": {
+        "coordinate_system": "PDF coordinate system with origin at bottom-left",
+        "y_coordinate_note": "Higher Y values are towards top of page",
+        "placeholder_coords": "These coordinates are ESTIMATES and must be calibrated by viewing actual PDF or screenshots",
+        "calibration_needed": true,
+        "next_steps": [
+            "View screenshots to identify exact field positions",
+            "Measure pixel coordinates from screenshots",
+            "Convert pixel coordinates to PDF points (assuming 72 DPI)",
+            "Test with sample data and adjust coordinates as needed"
+        ]
+    }
+}
