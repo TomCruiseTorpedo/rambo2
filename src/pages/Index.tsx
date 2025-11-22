@@ -61,7 +61,7 @@ const Index = () => {
     try {
       // Convert all files to base64 with metadata
       setProcessingStage('ocr');
-      const files: Array<{data: string, type: string, name: string}> = [];
+      const files: Array<{ data: string, type: string, name: string }> = [];
       for (let i = 0; i < selectedFiles.length; i++) {
         setCurrentFileIndex(i + 1);
         const fileData = await fileToBase64(selectedFiles[i]);
@@ -72,7 +72,7 @@ const Index = () => {
       // Guard: ensure payload isn't too large for the function
       const totalBytes = files.reduce((sum, f) => sum + Math.ceil((f.data.length * 3) / 4), 0) + (textInput ? new Blob([textInput]).size : 0);
       if (totalBytes > 6 * 1024 * 1024) {
-        throw new Error(`Your upload is too large (~${(totalBytes/1024/1024).toFixed(1)} MB). Please compress images or upload fewer files.`);
+        throw new Error(`Your upload is too large (~${(totalBytes / 1024 / 1024).toFixed(1)} MB). Please compress images or upload fewer files.`);
       }
 
       setProcessingStage('analyzing');
@@ -105,8 +105,12 @@ const Index = () => {
           throw error;
         }
       }
-      
+
       const splitResult = splitNarrative(data.result);
+      // Inject reasoning from API response if available
+      if (data.reasoning) {
+        splitResult.thinkingProcess = data.reasoning;
+      }
       setResults(splitResult);
       setProcessingProgress(100);
       setProcessingStage('complete');
@@ -172,15 +176,15 @@ const Index = () => {
     });
   };
 
-  const fileToBase64 = (file: File): Promise<{data: string, type: string, name: string}> => {
+  const fileToBase64 = (file: File): Promise<{ data: string, type: string, name: string }> => {
     return new Promise(async (resolve, reject) => {
       try {
         // For text files, read as text directly
-        if (file.type.startsWith('text/') || 
-            file.name.endsWith('.txt') || 
-            file.name.endsWith('.md') || 
-            file.name.endsWith('.log') ||
-            file.name.endsWith('.csv')) {
+        if (file.type.startsWith('text/') ||
+          file.name.endsWith('.txt') ||
+          file.name.endsWith('.md') ||
+          file.name.endsWith('.log') ||
+          file.name.endsWith('.csv')) {
           const reader = new FileReader();
           reader.readAsText(file);
           reader.onload = () => resolve({
@@ -292,7 +296,7 @@ const Index = () => {
               <Alert className="mb-4 sm:mb-6 bg-primary/5 border-primary/20">
                 <Info className="h-4 w-4 text-primary flex-shrink-0" />
                 <AlertDescription className="text-xs sm:text-sm">
-                  <strong>Knowledge Base Powered:</strong> Our AI uses the comprehensive SR&ED Q&A corpus 
+                  <strong>Knowledge Base Powered:</strong> Our AI uses the comprehensive SR&ED Q&A corpus
                   and process-entity model to generate narratives that strictly follow CRA T661/T4088 guidelines.
                 </AlertDescription>
               </Alert>
@@ -336,7 +340,7 @@ const Index = () => {
             <Alert className="mt-4 sm:mt-0">
               <Info className="h-4 w-4 flex-shrink-0" />
               <AlertDescription className="text-xs sm:text-sm">
-                <strong>Quick Check:</strong> Does your work involve solving a technical problem that 
+                <strong>Quick Check:</strong> Does your work involve solving a technical problem that
                 couldn't be resolved through standard methods? If yes, you likely have an SR&ED claim!
               </AlertDescription>
             </Alert>

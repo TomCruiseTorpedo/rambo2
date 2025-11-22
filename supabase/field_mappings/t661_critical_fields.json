@@ -1,0 +1,75 @@
+{
+    "metadata": {
+        "description": "EXACT coordinates extracted from static T661 PDF using PDF analysis",
+        "extraction_method": "PyPDF2 text+rectangle extraction with smart association",
+        "source": "t661-20e.pdf (static print version)",
+        "coordinates_verified": true
+    },
+    "line_242_uncertainties": {
+        "cra_line": "242",
+        "title": "Scientific or technological uncertainties",
+        "full_label": "What scientific or technological uncertainties did you attempt to overcome? (Maximum 350 words)",
+        "max_words": 350,
+        "max_lines": 50,
+        "page": 1,
+        "coordinates": {
+            "x0": 20.9,
+            "y0": 417.4,
+            "x1": 590.9,
+            "y1": 475.8
+        },
+        "dimensions": {
+            "width": 570.0,
+            "height": 58.4
+        },
+        "font_size": 9,
+        "line_height": 13
+    },
+    "line_244_work_performed": {
+        "cra_line": "244",
+        "title": "Work performed",
+        "full_label": "What work did you perform in the tax year to overcome the scientific or technological uncertainties described in line 242? (Summarize the systematic investigation or search) (Maximum 700 words)",
+        "max_words": 700,
+        "max_lines": 100,
+        "page": 1,
+        "coordinates": {
+            "x0": 20.9,
+            "y0": 164.7,
+            "x1": 590.9,
+            "y1": 386.2
+        },
+        "dimensions": {
+            "width": 570.0,
+            "height": 221.5
+        },
+        "font_size": 9,
+        "line_height": 13
+    },
+    "line_246_advancements": {
+        "cra_line": "246",
+        "title": "Scientific or technological advancements",
+        "full_label": "What scientific or technological advancements did you achieve or attempt to achieve as a result of the work described in line 244? (Maximum 350 words)",
+        "max_words": 350,
+        "max_lines": 50,
+        "page": 1,
+        "coordinates": {
+            "x0": 20.9,
+            "y0": 67.1,
+            "x1": 590.9,
+            "y1": 133.4
+        },
+        "dimensions": {
+            "width": 570.0,
+            "height": 66.3
+        },
+        "font_size": 9,
+        "line_height": 13
+    },
+    "usage_notes": {
+        "coordinate_system": "PDF points (72 DPI), origin at bottom-left",
+        "page_indexing": "Page 1 in mapping = Page 2 of form (0-indexed in pdf-lib)",
+        "text_wrapping": "Use 9pt font, 12pt line height, wrap at 570pts width",
+        "word_limits": "Enforce max_words during LLM generation to prevent overflow",
+        "extraction_source": "Coordinates extracted programmatically from static PDF, verified accurate"
+    }
+}

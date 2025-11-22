@@ -1,25 +1,26 @@
-FROM ollama/ollama:latest
+FROM ubuntu:22.04
 
-# Set environment variables
-# Set environment variables
-ENV OLLAMA_HOST=0.0.0.0:7860
-ENV OLLAMA_MODELS=/app/ollama_models
+# Install dependencies
+RUN apt-get update && apt-get install -y \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
 
-# Create the directory for models and set permissions
-RUN mkdir -p /app/ollama_models && chmod 777 /app/ollama_models
+# Set working directory
+WORKDIR /app
 
-# Copy the start script
-COPY start.sh /start.sh
-RUN chmod +x /start.sh
+# Download the model (DeepSeek-R1-Distill-Qwen-1.5B-Q6_K_L.gguf)
+RUN curl -L -o model.gguf https://huggingface.co/bartowski/DeepSeek-R1-Distill-Qwen-1.5B-GGUF/resolve/main/DeepSeek-R1-Distill-Qwen-1.5B-Q6_K_L.gguf
 
-# Create a user to run as (optional, but good practice, though Ollama usually runs as root in container)
-# For HF Spaces, we often run as a specific user ID (1000).
-# We set the user to 1000 to match HF Spaces default
-RUN useradd -m -u 1000 user
-USER user
+# Download llama-server binary (b4600)
+RUN curl -L -o llama-server https://github.com/ggerganov/llama.cpp/releases/download/b4600/llama-server-b4600-linux-amd64 && \
+    chmod +x llama-server
 
-# Expose the port (HF Spaces expects 7860)
+# Expose port 7860 (Hugging Face Spaces default)
 EXPOSE 7860
 
-# Entrypoint
-ENTRYPOINT ["/start.sh"]
+# Run the server
+# --host 0.0.0.0: Bind to all interfaces
+# --port 7860: Port expected by HF Spaces
+# --ctx-size 8192: Context window
+# --n-gpu-layers 0: CPU only
+CMD ["./llama-server", "--model", "model.gguf", "--host", "0.0.0.0", "--port", "7860", "--ctx-size", "8192", "--n-gpu-layers", "0"]

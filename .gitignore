@@ -21,6 +21,7 @@ env
 *.pem
 *.key
 *.cert
+*.gguf
 
 # Editor directories and files
 .vscode/*

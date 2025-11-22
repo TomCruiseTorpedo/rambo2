@@ -5,13 +5,17 @@
 This project is a vendor-agnostic implementation of SR&ED GPT, featuring:
 - **Frontend**: React + Vite (deployed on Vercel)
 - **Backend**: Supabase
-- **AI**: Open-source LLM (Phi-3.5) hosted on Hugging Face Spaces
+- **AI**: Hybrid 3-Tier Architecture (DeepSeek-R1-Distill-Qwen-1.5B)
+  - **Tier 1**: Hugging Face Serverless API (Primary)
+  - **Tier 2**: Self-Hosted Docker on HF Spaces (Backup)
+  - **Tier 3**: Groq API (Fallback)
 
 ## Getting Started
 
 ### Prerequisites
 - Node.js & npm
-- Docker (for local LLM testing)
+- Supabase CLI
+- Docker (optional, for local testing)
 
 ### Installation
 
@@ -44,6 +48,22 @@ This project is a vendor-agnostic implementation of SR&ED GPT, featuring:
 Connect this repository to Vercel and deploy. Ensure the build command is `npm run build` and output directory is `dist`.
 
 ### AI (Hugging Face Spaces)
-Deploy the `docker` directory to a Hugging Face Space using the Docker SDK.
-- Ensure the Space is set to expose port 7860.
-- The Dockerfile is configured to run as user 1000.
+This project uses a **Tier 2 Backup** hosted on Hugging Face Spaces.
+
+1. Create a new Space (SDK: Docker, Hardware: CPU Basic).
+2. Use the helper script to deploy the Dockerfile:
+   ```sh
+   ./scripts/deploy_to_hf.sh <your_hf_username> <space_name>
+   ```
+   Example: `./scripts/deploy_to_hf.sh myuser tomcruisemissile-rambo2`
+
+### Backend (Supabase)
+Deploy the Edge Functions:
+```sh
+npx supabase functions deploy process-sred --no-verify-jwt
+npx supabase functions deploy fill-pdf-t661 --no-verify-jwt
+```
+Ensure you have set the following secrets in Supabase:
+- `LLM_API_URL` (Your HF Space URL)
+- `LLM_API_KEY` (Your HF Token)
+- `GROQ_API_KEY` (Optional, for Tier 3 fallback)
