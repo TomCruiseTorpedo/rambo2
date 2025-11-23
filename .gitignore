@@ -41,4 +41,22 @@ Desktop.ini
 
 # Supabase
 supabase/functions/*/deno.lock
+supabase/.temp/
+supabase/templates/Screenshots*/
+supabase/templates/*screenshots*/
+
+# AI Context & Memory
+.ai_context/
+
+# Test outputs
+test_*.pdf
+test_output*.txt
+final_output.pdf
+deploy_output.txt
+
+
+
+
+
+
 

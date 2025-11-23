@@ -3,7 +3,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.4";
 
 // Hardcoded credentials for rambo2 project (nvuxsdwpqrtglgxwrbqa)
 const SUPABASE_URL = "https://nvuxsdwpqrtglgxwrbqa.supabase.co";
-const SUPABASE_SERVICE_ROLE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im52dXhzZHdwcXJ0Z2xneHdyYnFhIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc2MzY3ODUzNCwiZXhwIjoyMDc5MjU0NTM0fQ.hUT6jO06TfbOIzlHYu6DMgAYUYEkuFSrbL8gk1-lmus";
+const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
 
 if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
     console.error("Missing credentials");
