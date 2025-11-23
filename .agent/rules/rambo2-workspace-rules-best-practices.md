@@ -25,3 +25,9 @@ trigger: always_on
 *   **Rule**: Respect memory limits (128MB).
 *   **Action**: Do not use `fs.readFileSync` on large files in Edge Functions. Use streams.
 *   **Action**: Do not import heavy libraries (like `xlsx`) unless absolutely necessary and optimized.
+
+### E. Secret API Keys (Future Migration)
+*   **Current State**: Using legacy `service_role` key (works fine, but Supabase recommends migration).
+*   **Future Enhancement**: A Secret API key has been created in the Supabase Dashboard for eventual migration.
+*   **Action Required (Later)**: Update `scripts/upload_mapping.js` to use the Secret API key instead of `SUPABASE_SERVICE_ROLE_KEY`.
+*   **Benefits**: Better audit logging, revocability, SOC2 compliance alignment.
