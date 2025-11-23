@@ -7,9 +7,20 @@ import { fileURLToPath } from 'url';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// Hardcoded credentials for rambo2 project (nvuxsdwpqrtglgxwrbqa)
+// Load env vars
+const envPath = path.resolve(__dirname, '../env');
+if (fs.existsSync(envPath)) {
+    const envConfig = fs.readFileSync(envPath, 'utf8');
+    envConfig.split('\n').forEach(line => {
+        const [key, ...value] = line.split('=');
+        if (key && value) {
+            process.env[key.trim()] = value.join('=').trim().replace(/^["']|["']$/g, '');
+        }
+    });
+}
+
 const SUPABASE_URL = "https://nvuxsdwpqrtglgxwrbqa.supabase.co";
-const SUPABASE_SERVICE_ROLE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im52dXhzZHdwcXJ0Z2xneHdyYnFhIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc2MzY3ODUzNCwiZXhwIjoyMDc5MjU0NTM0fQ.hUT6jO06TfbOIzlHYu6DMgAYUYEkuFSrbL8gk1-lmus";
+const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
 if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
     console.error("Missing credentials");
