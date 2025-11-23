@@ -60,6 +60,8 @@ supabase/templates/*screenshots*/
 .ai_context/
 
 
+
+
 # Test outputs
 test_*.pdf
 test_output*.txt
