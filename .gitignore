@@ -34,6 +34,17 @@ env
 *.sln
 *.sw?
 
+# Development & Test Scripts
+scripts/test_*
+scripts/analyze_*
+scripts/explore_*
+scripts/extract_*
+scripts/find_*
+scripts/generate_*
+scripts/list_*
+scripts/debug_*
+
+
 # System
 Thumbs.db
 ehthumbs.db
@@ -47,6 +58,7 @@ supabase/templates/*screenshots*/
 
 # AI Context & Memory
 .ai_context/
+
 
 # Test outputs
 test_*.pdf
