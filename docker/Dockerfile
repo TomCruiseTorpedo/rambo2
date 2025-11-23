@@ -14,11 +14,11 @@ WORKDIR /app
 # Download the model (DeepSeek-R1-Distill-Qwen-1.5B-Q6_K_L.gguf)
 RUN curl -L -o model.gguf https://huggingface.co/bartowski/DeepSeek-R1-Distill-Qwen-1.5B-GGUF/resolve/main/DeepSeek-R1-Distill-Qwen-1.5B-Q6_K_L.gguf
 
-# Clone llama.cpp and build llama-server
+# Clone llama.cpp and build llama-server (static build)
 RUN git clone https://github.com/ggerganov/llama.cpp.git && \
     cd llama.cpp && \
     git checkout b4600 && \
-    cmake -B build -DGGML_CUDA=OFF -DGGML_METAL=OFF && \
+    cmake -B build -DGGML_CUDA=OFF -DGGML_METAL=OFF -DBUILD_SHARED_LIBS=OFF && \
     cmake --build build --config Release --target llama-server && \
     cp build/bin/llama-server /app/llama-server && \
     cd .. && \
