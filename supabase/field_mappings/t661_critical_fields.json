@@ -23,7 +23,8 @@
             "height": 58.4
         },
         "font_size": 9,
-        "line_height": 13
+        "line_height": 14.5,
+        "text_padding_top": 4
     },
     "line_244_work_performed": {
         "cra_line": "244",
@@ -43,7 +44,8 @@
             "height": 221.5
         },
         "font_size": 9,
-        "line_height": 13
+        "line_height": 14.5,
+        "text_padding_top": 4
     },
     "line_246_advancements": {
         "cra_line": "246",
@@ -63,7 +65,8 @@
             "height": 66.3
         },
         "font_size": 9,
-        "line_height": 13
+        "line_height": 14.2,
+        "text_padding_top": 5
     },
     "usage_notes": {
         "coordinate_system": "PDF points (72 DPI), origin at bottom-left",
