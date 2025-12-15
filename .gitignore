@@ -67,10 +67,14 @@ test_*.pdf
 test_output*.txt
 final_output.pdf
 deploy_output.txt
+production_test_output.pdf
 
-
-
-
+# Local Development Tools (NOT for public repo)
+.beads/
+.groupcode/
+group-code/
+kiro-upgrade.md
+ANTIGRAVITY_HANDOFF.md
 
 
 
