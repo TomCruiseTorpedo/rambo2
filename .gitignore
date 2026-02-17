@@ -75,6 +75,11 @@ production_test_output.pdf
 group-code/
 kiro-upgrade.md
 ANTIGRAVITY_HANDOFF.md
+BEADS_V30_UPGRADE.md
+
+# IDE-specific directories
+.kiro/
+.agent/
 
 
 
