@@ -1,7 +1,8 @@
-import { Loader2, X } from "lucide-react";
+import { Loader2, X, AlertTriangle, Wifi } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -12,7 +13,9 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { NetworkMonitor } from "@/utils/errorHandling";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 
 export type ProcessingStage = 'uploading' | 'ocr' | 'analyzing' | 'generating' | 'complete';
 
@@ -23,6 +26,8 @@ interface ProcessingStatusProps {
   totalItems?: number;
   estimatedTime?: number;
   onCancel: () => void;
+  error?: string;
+  onRetry?: () => void;
 }
 
 const stageMessages: Record<ProcessingStage, string> = {
@@ -39,22 +44,79 @@ export const ProcessingStatus = ({
   currentItem,
   totalItems,
   estimatedTime,
-  onCancel
+  onCancel,
+  error,
+  onRetry
 }: ProcessingStatusProps) => {
   const [showCancelDialog, setShowCancelDialog] = useState(false);
+  const [isOnline, setIsOnline] = useState(NetworkMonitor.getStatus());
+
+  useEffect(() => {
+    const unsubscribe = NetworkMonitor.addListener(setIsOnline);
+    return unsubscribe;
+  }, []);
 
   return (
-    <>
+    <ErrorBoundary 
+      level="component"
+      context={{
+        component: 'ProcessingStatus',
+        stage,
+        progress,
+        hasError: !!error
+      }}
+    >
       <Card className="p-4 sm:p-6 animate-fade-in">
         <div className="space-y-3 sm:space-y-4">
+          {/* Network status warning */}
+          {!isOnline && (
+            <Alert variant="destructive">
+              <Wifi className="h-4 w-4" />
+              <AlertDescription>
+                <strong>No Internet Connection:</strong> Processing may fail. Please check your connection.
+              </AlertDescription>
+            </Alert>
+          )}
+
+          {/* Error display */}
+          {error && (
+            <Alert variant="destructive">
+              <AlertTriangle className="h-4 w-4" />
+              <AlertDescription>
+                <strong>Processing Error:</strong> {error}
+                {onRetry && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={onRetry}
+                    className="ml-2 mt-2"
+                  >
+                    Try Again
+                  </Button>
+                )}
+              </AlertDescription>
+            </Alert>
+          )}
+
           <div className="flex items-center justify-between gap-2">
             <div className="flex items-center gap-2 sm:gap-3 flex-1 min-w-0">
-              <Loader2 className="h-4 w-4 sm:h-5 sm:w-5 animate-spin text-primary flex-shrink-0" />
+              {error ? (
+                <AlertTriangle className="h-4 w-4 sm:h-5 sm:w-5 text-destructive flex-shrink-0" />
+              ) : (
+                <Loader2 className="h-4 w-4 sm:h-5 sm:w-5 animate-spin text-primary flex-shrink-0" />
+              )}
               <div className="min-w-0 flex-1">
-                <p className="font-semibold text-sm sm:text-base truncate">{stageMessages[stage]}</p>
-                {currentItem && totalItems && (
+                <p className="font-semibold text-sm sm:text-base truncate">
+                  {error ? 'Processing Failed' : stageMessages[stage]}
+                </p>
+                {currentItem && totalItems && !error && (
                   <p className="text-xs sm:text-sm text-muted-foreground">
                     Processing item {currentItem} of {totalItems}
+                  </p>
+                )}
+                {error && (
+                  <p className="text-xs sm:text-sm text-muted-foreground">
+                    An error occurred during {stage}
                   </p>
                 )}
               </div>
@@ -70,11 +132,11 @@ export const ProcessingStatus = ({
             </Button>
           </div>
 
-          <Progress value={progress} className="h-2" />
+          {!error && <Progress value={progress} className="h-2" />}
 
           <div className="flex items-center justify-between text-xs sm:text-sm text-muted-foreground">
-            <span>{Math.round(progress)}% complete</span>
-            {estimatedTime && (
+            <span>{error ? 'Failed' : `${Math.round(progress)}% complete`}</span>
+            {estimatedTime && !error && (
               <span>~{estimatedTime}s remaining</span>
             )}
           </div>
@@ -97,6 +159,6 @@ export const ProcessingStatus = ({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </>
+    </ErrorBoundary>
   );
 };

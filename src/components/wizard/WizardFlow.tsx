@@ -87,50 +87,71 @@ export const WizardFlow = ({
 
   return (
     <div className="space-y-4 sm:space-y-6">
-      <Card className="p-4 sm:p-6">
+      <Card className="p-4 sm:p-6" role="region" aria-labelledby="wizard-progress">
         <div className="space-y-3 sm:space-y-4">
-          <div className="flex items-center justify-between">
-            <h3 className="font-semibold text-base sm:text-lg">Generate SR&ED Narrative</h3>
-            <span className="text-xs sm:text-sm text-muted-foreground">Step {hasMultipleInputs ? currentStep : currentStep === 1 ? 1 : 2} of {totalSteps}</span>
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+            <h2 id="wizard-progress" className="font-semibold text-base sm:text-lg">Generate SR&ED Narrative</h2>
+            <span className="text-xs sm:text-sm text-muted-foreground" aria-live="polite">
+              Step {hasMultipleInputs ? currentStep : currentStep === 1 ? 1 : 2} of {totalSteps}
+            </span>
           </div>
-          <Progress value={progress} className="h-2" />
+          <Progress 
+            value={progress} 
+            className="h-2" 
+            aria-label={`Progress: ${Math.round(progress)}% complete`}
+          />
         </div>
       </Card>
 
       {currentStep === 1 && (
-        <Card className="p-4 sm:p-6 space-y-4 sm:space-y-6 animate-fade-in">
+        <Card className="p-4 sm:p-6 space-y-4 sm:space-y-6 animate-fade-in" role="region" aria-labelledby="step-1-heading">
           <div>
-            <h4 className="font-semibold text-sm sm:text-base mb-2">Step 1: Gather Evidence</h4>
+            <h3 id="step-1-heading" className="font-semibold text-sm sm:text-base mb-2">Step 1: Gather Evidence</h3>
             <p className="text-xs sm:text-sm text-muted-foreground">
               Provide your technical data - paste text or upload files of documentation.
             </p>
           </div>
 
           <Tabs defaultValue="images" className="w-full">
-            <TabsList className="grid w-full grid-cols-2">
-              <TabsTrigger value="images">File Upload</TabsTrigger>
-              <TabsTrigger value="text">Text Input</TabsTrigger>
+            <TabsList className="grid w-full grid-cols-2" role="tablist" aria-label="Input method selection">
+              <TabsTrigger value="images" className="text-xs sm:text-sm">File Upload</TabsTrigger>
+              <TabsTrigger value="text" className="text-xs sm:text-sm">Text Input</TabsTrigger>
             </TabsList>
-            <TabsContent value="images" className="mt-4">
+            <TabsContent value="images" className="mt-4" role="tabpanel" aria-labelledby="file-upload-tab">
               <EnhancedMultiImageUpload
                 onFilesSelect={onFilesSelect}
                 selectedFiles={selectedFiles}
                 onRemoveFile={onRemoveFile}
               />
             </TabsContent>
-            <TabsContent value="text" className="mt-4">
+            <TabsContent value="text" className="mt-4" role="tabpanel" aria-labelledby="text-input-tab">
               <TextInput value={textInput} onChange={onTextInputChange} />
             </TabsContent>
           </Tabs>
 
-          <div className="flex flex-col sm:flex-row gap-2">
-            <Button onClick={handleGenerateDemoFiles} variant="outline" className="flex-1 text-sm">
-              <FileText className="mr-2 h-3 w-3 sm:h-4 sm:w-4" />
+          <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
+            <Button 
+              onClick={handleGenerateDemoFiles} 
+              variant="outline" 
+              className="flex-1 text-xs sm:text-sm"
+              aria-describedby="demo-files-description"
+            >
+              <FileText className="mr-2 h-3 w-3 sm:h-4 sm:w-4" aria-hidden="true" />
               Generate Demo Files
             </Button>
-            <Button onClick={() => setCurrentStep(hasMultipleInputs ? 2 : 3)} disabled={!hasInput} className="flex-1 text-sm">
-              Continue <ChevronRight className="ml-2 h-3 w-3 sm:h-4 sm:w-4" />
+            <Button 
+              onClick={() => setCurrentStep(hasMultipleInputs ? 2 : 3)} 
+              disabled={!hasInput} 
+              className="flex-1 text-xs sm:text-sm"
+              aria-describedby={!hasInput ? "continue-disabled-description" : undefined}
+            >
+              Continue <ChevronRight className="ml-2 h-3 w-3 sm:h-4 sm:w-4" aria-hidden="true" />
             </Button>
+          </div>
+          
+          <div className="sr-only">
+            <p id="demo-files-description">Generates sample SR&ED documentation files for testing</p>
+            <p id="continue-disabled-description">Please upload files or enter text to continue</p>
           </div>
         </Card>
       )}

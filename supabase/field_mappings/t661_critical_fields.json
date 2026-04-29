@@ -8,15 +8,15 @@
     "line_242_uncertainties": {
         "cra_line": "242",
         "title": "Scientific or technological uncertainties",
-        "full_label": "What scientific or technological uncertainties did you attempt to overcome? (Maximum 350 words)",
-        "max_words": 350,
-        "max_lines": 50,
+        "full_label": "What scientific or technological uncertainties did you attempt to overcome? (Maximum 80 words)",
+        "max_words": 80,
+        "max_lines": 4,
         "page": 1,
         "coordinates": {
             "x0": 20.9,
-            "y0": 417.4,
+            "y0": 475.8,
             "x1": 590.9,
-            "y1": 475.8
+            "y1": 417.4
         },
         "dimensions": {
             "width": 570.0,
@@ -30,14 +30,14 @@
         "cra_line": "244",
         "title": "Work performed",
         "full_label": "What work did you perform in the tax year to overcome the scientific or technological uncertainties described in line 242? (Summarize the systematic investigation or search) (Maximum 700 words)",
-        "max_words": 700,
-        "max_lines": 100,
+        "max_words": 300,
+        "max_lines": 15,
         "page": 1,
         "coordinates": {
             "x0": 20.9,
-            "y0": 164.7,
+            "y0": 386.2,
             "x1": 590.9,
-            "y1": 386.2
+            "y1": 164.7
         },
         "dimensions": {
             "width": 570.0,
@@ -50,15 +50,15 @@
     "line_246_advancements": {
         "cra_line": "246",
         "title": "Scientific or technological advancements",
-        "full_label": "What scientific or technological advancements did you achieve or attempt to achieve as a result of the work described in line 244? (Maximum 350 words)",
-        "max_words": 350,
-        "max_lines": 50,
+        "full_label": "What scientific or technological advancements did you achieve or attempt to achieve as a result of the work described in line 244? (Maximum 80 words)",
+        "max_words": 80,
+        "max_lines": 4,
         "page": 1,
         "coordinates": {
             "x0": 20.9,
-            "y0": 67.1,
+            "y0": 133.4,
             "x1": 590.9,
-            "y1": 133.4
+            "y1": 67.1
         },
         "dimensions": {
             "width": 570.0,

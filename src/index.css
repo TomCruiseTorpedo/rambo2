@@ -24,7 +24,7 @@ All colors MUST be HSL.
     --secondary-foreground: 222 47% 11%;
 
     --muted: 210 40% 96%;
-    --muted-foreground: 215 16% 47%;
+    --muted-foreground: 215 16% 45%;
 
     --accent: 142 76% 36%;
     --accent-foreground: 0 0% 100%;
@@ -78,7 +78,7 @@ All colors MUST be HSL.
     --secondary-foreground: 210 40% 98%;
 
     --muted: 217 33% 17%;
-    --muted-foreground: 215 20% 65%;
+    --muted-foreground: 215 20% 70%;
 
     --accent: 142 76% 36%;
     --accent-foreground: 0 0% 100%;
@@ -112,5 +112,61 @@ All colors MUST be HSL.
 
   body {
     @apply bg-background text-foreground;
+  }
+
+  /* Enhanced focus styles for better accessibility */
+  *:focus-visible {
+    @apply outline-none ring-2 ring-ring ring-offset-2 ring-offset-background;
+  }
+
+  /* Ensure interactive elements have proper focus indicators */
+  button:focus-visible,
+  [role="button"]:focus-visible,
+  input:focus-visible,
+  textarea:focus-visible,
+  select:focus-visible {
+    @apply ring-2 ring-primary ring-offset-2;
+  }
+
+  /* Skip link for screen readers */
+  .skip-link {
+    @apply absolute -top-10 left-4 z-50 bg-primary text-primary-foreground px-4 py-2 rounded-md;
+    @apply focus:top-4 transition-all duration-200;
+  }
+
+  /* Reduced motion preferences */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+
+  /* High contrast mode support */
+  @media (prefers-contrast: high) {
+    :root {
+      --border: 0 0% 20%;
+      --muted-foreground: 0 0% 30%;
+    }
+    
+    .dark {
+      --border: 0 0% 80%;
+      --muted-foreground: 0 0% 70%;
+    }
+  }
+
+  /* Touch target improvements for mobile */
+  @media (pointer: coarse) {
+    button,
+    [role="button"],
+    input[type="button"],
+    input[type="submit"] {
+      min-height: 44px;
+      min-width: 44px;
+    }
   }
 }

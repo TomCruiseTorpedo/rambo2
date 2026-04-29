@@ -27,12 +27,24 @@ export const NarrativeSection = ({
   const [isOpen, setIsOpen] = useState(true);
   const [isEditing, setIsEditing] = useState(false);
   const [editedContent, setEditedContent] = useState(content);
+  const [isCopying, setIsCopying] = useState(false);
+  const [justCopied, setJustCopied] = useState(false);
 
   const wordCount = content.split(/\s+/).filter(w => w.length > 0).length;
 
-  const handleCopy = () => {
-    navigator.clipboard.writeText(content);
-    toast.success(`Line ${lineNumber} copied to clipboard`);
+  const handleCopy = async () => {
+    try {
+      setIsCopying(true);
+      await navigator.clipboard.writeText(content);
+      setJustCopied(true);
+      toast.success(`Line ${lineNumber} copied to clipboard`);
+      setTimeout(() => setJustCopied(false), 2000);
+    } catch (error) {
+      console.error('Failed to copy text:', error);
+      toast.error('Failed to copy text');
+    } finally {
+      setIsCopying(false);
+    }
   };
 
   const handleSave = () => {
@@ -129,9 +141,23 @@ export const NarrativeSection = ({
                     <Edit2 className="h-4 w-4 mr-2" />
                     Edit
                   </Button>
-                  <Button onClick={handleCopy} variant="outline" size="sm">
-                    <Copy className="h-4 w-4 mr-2" />
-                    Copy
+                  <Button 
+                    onClick={handleCopy} 
+                    variant="outline" 
+                    size="sm"
+                    disabled={isCopying}
+                  >
+                    {justCopied ? (
+                      <>
+                        <Check className="h-4 w-4 mr-2" />
+                        Copied!
+                      </>
+                    ) : (
+                      <>
+                        <Copy className="h-4 w-4 mr-2" />
+                        {isCopying ? 'Copying...' : 'Copy'}
+                      </>
+                    )}
                   </Button>
                 </div>
               </>

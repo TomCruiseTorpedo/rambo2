@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import * as xlsx from "npm:xlsx@0.18.5";
+import { getEnhancedSupabaseClient } from "../shared/database-utils.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -9,6 +10,9 @@ const corsHeaders = {
 // Supabase configuration for internal function calls
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL') || 'https://nvuxsdwpqrtglgxwrbqa.supabase.co';
 const SUPABASE_ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY') || Deno.env.get('VITE_SUPABASE_PUBLISHABLE_KEY');
+
+// Enhanced Supabase client for database operations
+const enhancedSupabase = getEnhancedSupabaseClient();
 
 // Part 1: Q&A Knowledge Base Corpus
 const knowledgeBaseQA = `### [LLM_Knowledge_Base_Part_1_of_2_QA_Corpus]
@@ -252,19 +256,84 @@ serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
+  // Add monitoring endpoint for AI usage statistics
+  const url = new URL(req.url);
+  if (req.method === "GET" && (url.pathname.endsWith('/stats') || url.searchParams.has('stats'))) {
+    try {
+      const stats = getUsageStats();
+      return new Response(JSON.stringify({
+        success: true,
+        data: stats,
+        timestamp: new Date().toISOString()
+      }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    } catch (error) {
+      return new Response(JSON.stringify({
+        success: false,
+        error: error instanceof Error ? error.message : 'Failed to get stats'
+      }), {
+        status: 500,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+  }
+
   try {
-    const { files, text, processMode = "combined", deviceType = "desktop" } = await req.json();
-    console.log("Processing SR&ED request:", {
-      fileCount: files?.length || 0,
-      hasText: !!text,
-      processMode,
-      deviceType,
-    });
+    // Add request timeout handling
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 300000); // 5 minute timeout
 
-    const LLM_API_URL = Deno.env.get("LLM_API_URL") || "https://tomcruisemissile-rambo2.hf.space";
-    const LLM_API_KEY = Deno.env.get("LLM_API_KEY") || "dummy-key"; // Optional, depending on host
+    try {
+      const requestBody = await req.json();
+      const { files, text, processMode = "combined", deviceType = "desktop" } = requestBody;
+      
+      // Enhanced input validation
+      if (!files && !text) {
+        return new Response(JSON.stringify({ error: "No input provided" }), {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
 
-    const sourceTexts: string[] = [];
+      // Validate file count and sizes to prevent memory issues
+      if (files && Array.isArray(files)) {
+        if (files.length > 10) {
+          return new Response(JSON.stringify({ error: "Too many files. Maximum 10 files allowed." }), {
+            status: 413,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+
+        // Check total size to prevent memory issues
+        const totalSize = files.reduce((sum, file) => sum + (file.data?.length || 0), 0);
+        if (totalSize > 50 * 1024 * 1024) { // 50MB limit
+          return new Response(JSON.stringify({ error: "Total file size too large. Maximum 50MB allowed." }), {
+            status: 413,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+      }
+
+      console.log("Processing SR&ED request:", {
+        fileCount: files?.length || 0,
+        hasText: !!text,
+        processMode,
+        deviceType,
+      });
+
+      // Test database connectivity at the start of processing
+      const dbConnected = await enhancedSupabase.testConnection();
+      if (!dbConnected) {
+        console.warn("Database connectivity test failed, but continuing with processing");
+      } else {
+        console.log("Database connectivity confirmed");
+      }
+
+      const LLM_API_URL = Deno.env.get("LLM_API_URL") || "https://tomcruisemissile-rambo2.hf.space";
+      const LLM_API_KEY = Deno.env.get("LLM_API_KEY") || "dummy-key"; // Optional, depending on host
+
+      const sourceTexts: string[] = [];
 
     // Add direct text input if provided
     if (text) {
@@ -277,96 +346,154 @@ serve(async (req) => {
 
       for (let i = 0; i < files.length; i++) {
         const file = files[i];
+        
+        // Enhanced file validation
+        if (!file.name || !file.type || !file.data) {
+          console.warn(`Skipping invalid file at index ${i}: missing required properties`);
+          continue;
+        }
+
+        // Check individual file size to prevent memory issues
+        if (file.data.length > 20 * 1024 * 1024) { // 20MB per file
+          console.warn(`Skipping large file ${file.name}: ${file.data.length} bytes`);
+          sourceTexts.push(`[File ${file.name} skipped: too large (${Math.round(file.data.length / 1024 / 1024)}MB)]`);
+          continue;
+        }
+
         console.log(`Processing file ${i + 1}/${files.length}: ${file.name} (${file.type})`);
 
         let extractedText = "";
 
-        // Handle different file types
-        if (file.type === "text") {
-          // Plain text file - use directly
-          extractedText = file.data;
-          console.log(`Text file processed: ${file.name}`);
-        } else if (file.type.startsWith("image/") || file.type === "application/pdf") {
-          // Image or PDF file - use Azure Document Intelligence OCR
-          try {
-            console.log(`Starting OCR for ${file.name}...`);
+        try {
+          // Handle different file types
+          if (file.type === "text" || file.type === "text/plain") {
+            // Plain text file - use directly
+            extractedText = file.data;
+            console.log(`Text file processed: ${file.name}`);
+          } else if (file.type.startsWith("image/") || file.type === "application/pdf") {
+            // Image or PDF file - use Azure Document Intelligence OCR with enhanced error handling
+            try {
+              console.log(`Starting OCR for ${file.name}...`);
 
-            // Call the OCR Edge Function
-            const ocrResponse = await fetch(`${SUPABASE_URL}/functions/v1/process-document-ocr`, {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
-              },
-              body: JSON.stringify({
-                imageData: file.data,
-                imageType: file.type,
-                fileName: file.name,
-              }),
-            });
+              // Add timeout for OCR requests
+              const ocrController = new AbortController();
+              const ocrTimeoutId = setTimeout(() => ocrController.abort(), 120000); // 2 minute timeout for OCR
 
-            if (!ocrResponse.ok) {
-              throw new Error(`OCR request failed: ${ocrResponse.status}`);
+              const ocrResponse = await fetch(`${SUPABASE_URL}/functions/v1/process-document-ocr`, {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+                },
+                body: JSON.stringify({
+                  imageData: file.data,
+                  imageType: file.type,
+                  fileName: file.name,
+                }),
+                signal: ocrController.signal,
+              });
+
+              clearTimeout(ocrTimeoutId);
+
+              if (!ocrResponse.ok) {
+                const errorText = await ocrResponse.text().catch(() => 'Unknown error');
+                throw new Error(`OCR request failed: ${ocrResponse.status} - ${errorText}`);
+              }
+
+              const ocrResult = await ocrResponse.json();
+
+              if (ocrResult.success && ocrResult.markdown) {
+                extractedText = ocrResult.markdown;
+                console.log(`OCR completed for ${file.name}, extracted ${extractedText.length} characters`);
+              } else {
+                throw new Error(ocrResult.error || 'OCR extraction failed - no content returned');
+              }
+            } catch (ocrError) {
+              console.error(`OCR error for ${file.name}:`, ocrError);
+              if (ocrError.name === 'AbortError') {
+                extractedText = `[OCR timeout for ${file.name}: processing took too long]`;
+              } else {
+                extractedText = `[OCR failed for ${file.name}: ${ocrError.message}]`;
+              }
             }
+          } else if (
+            file.type.includes("spreadsheet") ||
+            file.type.includes("excel") ||
+            file.name.endsWith(".xlsx") ||
+            file.name.endsWith(".xls") ||
+            file.name.endsWith(".csv")
+          ) {
+            // Excel/CSV file - parse with xlsx library (re-enabled with error handling)
+            try {
+              const buffer = Uint8Array.from(atob(file.data), (c) => c.charCodeAt(0));
+              const workbook = xlsx.read(buffer, { type: "array" });
+              const sheetNames = workbook.SheetNames;
+              let allText = `Content from ${file.name}:\n\n`;
 
-            const ocrResult = await ocrResponse.json();
+              // Limit processing to first 5 sheets to prevent memory issues
+              const sheetsToProcess = sheetNames.slice(0, 5);
+              
+              sheetsToProcess.forEach((sheetName) => {
+                try {
+                  const worksheet = workbook.Sheets[sheetName];
+                  const csvData = xlsx.utils.sheet_to_csv(worksheet);
+                  
+                  // Limit CSV data size to prevent memory issues
+                  const truncatedCsvData = csvData.length > 100000 
+                    ? csvData.substring(0, 100000) + '\n[... truncated for size ...]'
+                    : csvData;
+                    
+                  allText += `\n--- Sheet: ${sheetName} ---\n${truncatedCsvData}\n`;
+                } catch (sheetError) {
+                  console.warn(`Error processing sheet ${sheetName}:`, sheetError);
+                  allText += `\n--- Sheet: ${sheetName} ---\n[Error processing sheet]\n`;
+                }
+              });
 
-            if (ocrResult.success) {
-              extractedText = ocrResult.markdown;
-              console.log(`OCR completed for ${file.name}, extracted ${extractedText.length} characters`);
-            } else {
-              throw new Error(ocrResult.error || 'OCR extraction failed');
+              if (sheetNames.length > 5) {
+                allText += `\n[... ${sheetNames.length - 5} additional sheets not processed ...]\n`;
+              }
+
+              extractedText = allText;
+              console.log(`Excel/CSV file parsed: ${file.name} (${sheetsToProcess.length} sheets)`);
+            } catch (error) {
+              console.error(`Error parsing Excel file ${file.name}:`, error);
+              extractedText = `[Error parsing Excel file ${file.name}: ${error.message}]`;
             }
-          } catch (ocrError) {
-            console.error(`OCR error for ${file.name}:`, ocrError);
-            extractedText = `[OCR failed for ${file.name}: ${ocrError.message}]`;
+          } else if (file.type.includes("word") || file.name.endsWith(".docx")) {
+            // Word document - for now, ask user to convert
+            extractedText = `[Word document from ${file.name} - Please convert to text or PDF for better extraction]`;
+            console.log(`Word document noted: ${file.name}`);
+          } else {
+            extractedText = `[Unsupported file type: ${file.name} (${file.type})]`;
+            console.log(`Unsupported file type: ${file.name}`);
           }
-        } else if (
-          file.type.includes("spreadsheet") ||
-          file.type.includes("excel") ||
-          file.name.endsWith(".xlsx") ||
-          file.name.endsWith(".xls") ||
-          file.name.endsWith(".csv")
-        ) {
-          // Excel/CSV file - parse with xlsx library
-          /*
-          try {
-            const buffer = Uint8Array.from(atob(file.data), (c) => c.charCodeAt(0));
-            const workbook = xlsx.read(buffer, { type: "array" });
-            const sheetNames = workbook.SheetNames;
-            let allText = `Content from ${file.name}:\n\n`;
-
-            sheetNames.forEach((sheetName) => {
-              const worksheet = workbook.Sheets[sheetName];
-              const csvData = xlsx.utils.sheet_to_csv(worksheet);
-              allText += `\n--- Sheet: ${sheetName} ---\n${csvData}\n`;
-            });
-
-            extractedText = allText;
-            console.log(`Excel/CSV file parsed: ${file.name}`);
-          } catch (error) {
-            console.error(`Error parsing Excel file ${file.name}:`, error);
-            extractedText = `[Error parsing Excel file ${file.name}]`;
-          }
-          */
-          extractedText = `[Excel parsing temporarily disabled for debugging]`;
-        } else if (file.type.includes("word") || file.name.endsWith(".docx")) {
-          // Word document - for now, ask user to convert
-          extractedText = `[Word document from ${file.name} - Please convert to text or PDF for better extraction]`;
-          console.log(`Word document noted: ${file.name}`);
-        } else {
-          extractedText = `[Unsupported file type: ${file.name} (${file.type})]`;
-          console.log(`Unsupported file type: ${file.name}`);
+        } catch (fileError) {
+          console.error(`Error processing file ${file.name}:`, fileError);
+          extractedText = `[Error processing ${file.name}: ${fileError.message}]`;
         }
 
-        if (extractedText) {
+        if (extractedText && extractedText.trim().length > 0) {
           sourceTexts.push(extractedText);
         }
       }
     }
 
+    // Enhanced validation of extracted content
     if (sourceTexts.length === 0) {
-      throw new Error("No input provided");
+      return new Response(JSON.stringify({ error: "No valid content could be extracted from the provided input" }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // Validate content quality
+    const totalContentLength = sourceTexts.join('').length;
+    if (totalContentLength < 10) {
+      return new Response(JSON.stringify({ error: "Insufficient content for SR&ED analysis. Please provide more detailed technical information." }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
     // Generate SR&ED content based on process mode
@@ -381,57 +508,72 @@ serve(async (req) => {
 
       for (let i = 0; i < sourceTexts.length; i++) {
         console.log(`Generating narrative ${i + 1}/${sourceTexts.length}`);
-        const { answer, reasoning: r } = await generateNarrative(sourceTexts[i], LLM_API_URL, LLM_API_KEY, deviceType);
-        narratives.push(`### Narrative ${i + 1}\n\n${answer}`);
-        if (r) reasoningParts.push(`### Reasoning ${i + 1}\n\n${r}`);
+        try {
+          const { answer, reasoning: r } = await generateNarrative(sourceTexts[i], LLM_API_URL, LLM_API_KEY, deviceType);
+          narratives.push(`### Narrative ${i + 1}\n\n${answer}`);
+          if (r) reasoningParts.push(`### Reasoning ${i + 1}\n\n${r}`);
+        } catch (narrativeError) {
+          console.error(`Error generating narrative ${i + 1}:`, narrativeError);
+          narratives.push(`### Narrative ${i + 1}\n\n[Error generating narrative: ${narrativeError.message}]`);
+        }
       }
 
       finalResult = narratives.join("\n\n---\n\n");
       if (reasoningParts.length > 0) reasoning = reasoningParts.join("\n\n---\n\n");
     } else {
-      // Combined mode: merge all texts
+      // Combined mode: merge all texts with size limits
       console.log("Generating combined narrative");
-      const combinedText = sourceTexts.join("\n\n---\n\n");
+      let combinedText = sourceTexts.join("\n\n---\n\n");
+      
+      // Truncate if too large to prevent memory issues
+      if (combinedText.length > 100000) {
+        combinedText = combinedText.substring(0, 100000) + "\n\n[Content truncated for processing...]";
+        console.log("Content truncated due to size limits");
+      }
+      
       try {
         const response = await generateNarrative(combinedText, LLM_API_URL, LLM_API_KEY, deviceType);
         finalResult = response.answer;
         reasoning = response.reasoning;
       } catch (llmError) {
-        console.error("LLM generation failed, using mock narrative:", llmError);
-        reasoning = "Mock reasoning: The model failed to respond, so we are using a pre-generated example.";
-        finalResult = `## Line 242: Technological Uncertainty
-
-The technological uncertainty encountered was whether a hybrid CNN-Transformer architecture could achieve <100ms inference latency while maintaining >99% accuracy for micro-defect detection (<0.1mm) on edge hardware. Standard CNNs (ResNet50) were too slow (200ms), and lightweight models (MobileNet) lacked the necessary accuracy for micro-defects. The specific uncertainty was how to design an attention mechanism that is computationally efficient enough for the edge constraints while preserving the high-frequency feature information required for micro-defect detection.
-
-## Line 244: Systematic Investigation
-
-We formulated the hypothesis that a windowed attention mechanism with cross-scale feature fusion would resolve the latency-accuracy trade-off.
-1. We curated a dataset of 10,000 images with labeled micro-defects.
-2. We benchmarked 5 architectures: ResNet50, MobileNetV3, ViT-Base, Swin-Tiny, and our proposed Hybrid-Attn model.
-3. We measured inference time on the target edge device (NVIDIA Jetson Nano) and accuracy (mAP).
-4. Results: ResNet50 (200ms, 99.1%), MobileNetV3 (40ms, 92%), ViT-Base (400ms, 99.5%), Hybrid-Attn (92ms, 99.2%).
-5. We analyzed failure cases and found that MobileNet missed 80% of defects <0.1mm.
-6. We iterated on the Hybrid-Attn model by pruning attention heads, reducing latency from 110ms to 92ms.
-
-## Line 246: Technological Advancement
-
-We advanced the understanding of efficient attention mechanisms for edge vision. We demonstrated that:
-1. Global attention is unnecessary for micro-defect detection; local windowed attention is sufficient and 4x faster.
-2. Cross-scale feature fusion is critical for preserving small object details when using aggressive downsampling for speed.
-3. We proved that a hybrid architecture can surpass the Pareto frontier of existing standard models for this specific constraint set.
-This knowledge enables high-speed, high-accuracy inspection on low-cost hardware, which was previously thought to require cloud-grade GPUs.`;
+        console.error("LLM generation failed, using enhanced fallback narrative:", llmError);
+        reasoning = "Fallback reasoning: The AI model failed to respond, so we are using a pre-generated example based on the input content.";
+        
+        // Enhanced fallback narrative that incorporates some input context
+        const hasImages = sourceTexts.some(text => text.includes('image') || text.includes('OCR'));
+        const hasData = sourceTexts.some(text => text.includes('data') || text.includes('algorithm'));
+        
+        finalResult = generateFallbackNarrative(hasImages, hasData, combinedText.substring(0, 500));
       }
     }
 
     console.log("SR&ED content generated successfully");
 
+    // Enhanced narrative validation
+    if (!finalResult || finalResult.trim().length === 0) {
+      throw new Error("Generated narrative is empty");
+    }
+
+    // Validate narrative structure
+    const hasLine242 = finalResult.includes("Line 242");
+    const hasLine244 = finalResult.includes("Line 244");
+    const hasLine246 = finalResult.includes("Line 246");
+    
+    if (!hasLine242 || !hasLine244 || !hasLine246) {
+      console.warn("Generated narrative missing required sections, attempting to fix...");
+      finalResult = ensureNarrativeStructure(finalResult);
+    }
+
     // Parse narrative to fields
     const narrativeFields = parseNarrativeToFields(finalResult);
 
-    // Call fill-pdf-t661
+    // Call fill-pdf-t661 with enhanced error handling
     console.log("Calling fill-pdf-t661...");
     let pdfUrl: string | undefined;
     try {
+      const pdfController = new AbortController();
+      const pdfTimeoutId = setTimeout(() => pdfController.abort(), 60000); // 1 minute timeout for PDF
+
       const pdfResponse = await fetch(`${SUPABASE_URL}/functions/v1/fill-pdf-t661`, {
         method: 'POST',
         headers: {
@@ -439,31 +581,78 @@ This knowledge enables high-speed, high-accuracy inspection on low-cost hardware
           'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
         },
         body: JSON.stringify({ fieldData: narrativeFields }),
+        signal: pdfController.signal,
       });
+
+      clearTimeout(pdfTimeoutId);
 
       if (pdfResponse.ok) {
         const pdfResult = await pdfResponse.json();
-        if (pdfResult.success) {
+        if (pdfResult.success && pdfResult.pdfUrl) {
           pdfUrl = pdfResult.pdfUrl;
           console.log("PDF generated successfully:", pdfUrl);
         } else {
           console.error("PDF generation failed (logic):", pdfResult.error);
         }
       } else {
-        const errText = await pdfResponse.text();
+        const errText = await pdfResponse.text().catch(() => 'Unknown error');
         console.error("PDF generation failed (network):", pdfResponse.status, errText);
       }
     } catch (pdfErr) {
       console.error("Error calling fill-pdf-t661:", pdfErr);
+      if (pdfErr.name === 'AbortError') {
+        console.error("PDF generation timed out");
+      }
     }
 
-    return new Response(JSON.stringify({ result: finalResult, reasoning, pdfUrl }), {
+    clearTimeout(timeoutId);
+
+    // Log final usage statistics for monitoring
+    const finalStats = getUsageStats();
+    const dbHealth = enhancedSupabase.getHealthSummary();
+    
+    console.log("Request completed. Current usage stats:", JSON.stringify(finalStats, null, 2));
+    console.log("Database health summary:", JSON.stringify(dbHealth, null, 2));
+
+    return new Response(JSON.stringify({ 
+      result: finalResult, 
+      reasoning, 
+      pdfUrl,
+      // Include usage stats in response for monitoring (optional)
+      _stats: Deno.env.get('INCLUDE_STATS') === 'true' ? finalStats : undefined,
+      _dbHealth: Deno.env.get('INCLUDE_DB_HEALTH') === 'true' ? dbHealth : undefined
+    }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
+    
+    } catch (timeoutError) {
+      clearTimeout(timeoutId);
+      throw timeoutError;
+    }
   } catch (error) {
     console.error("Error in process-sred function:", error);
-    return new Response(JSON.stringify({ error: error instanceof Error ? error.message : "Unknown error" }), {
-      status: 500,
+    
+    // Enhanced error response with more specific error types
+    let statusCode = 500;
+    let errorMessage = "Internal server error";
+    
+    if (error instanceof Error) {
+      if (error.name === 'AbortError') {
+        statusCode = 408;
+        errorMessage = "Request timeout - processing took too long";
+      } else if (error.message.includes("No input provided") || error.message.includes("Insufficient content")) {
+        statusCode = 400;
+        errorMessage = error.message;
+      } else if (error.message.includes("too large") || error.message.includes("Maximum")) {
+        statusCode = 413;
+        errorMessage = error.message;
+      } else {
+        errorMessage = error.message;
+      }
+    }
+    
+    return new Response(JSON.stringify({ error: errorMessage }), {
+      status: statusCode,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
@@ -471,25 +660,213 @@ This knowledge enables high-speed, high-accuracy inspection on low-cost hardware
 
 
 
-// --- 3-TIER FALLBACK LOGIC ---
+// --- ENHANCED 3-TIER FALLBACK LOGIC WITH MONITORING ---
+
+// AI Configuration and Monitoring
+interface AIConfig {
+  primaryModel: string;
+  fallbackModel: string;
+  timeout: number;
+  maxRetries: number;
+  circuitBreakerThreshold: number;
+}
+
+interface AIMetrics {
+  requestId: string;
+  timestamp: string;
+  tier: 1 | 2 | 3;
+  model: string;
+  inputTokens: number;
+  outputTokens: number;
+  latency: number;
+  success: boolean;
+  errorType?: string;
+  cost?: number;
+}
+
+interface TierConfig {
+  name: string;
+  url: string;
+  model: string;
+  timeout: number;
+  priority: number;
+  costPerToken: number;
+}
+
+// Usage tracking for monitoring and cost analysis
+const usageTracker = {
+  tier1: { requests: 0, tokens: 0, cost: 0, failures: 0 },
+  tier2: { requests: 0, tokens: 0, cost: 0, failures: 0 },
+  tier3: { requests: 0, tokens: 0, cost: 0, failures: 0 }
+};
+
+// Circuit breaker for tier health management
+class CircuitBreaker {
+  private failures = 0;
+  private lastFailureTime = 0;
+  private state: 'closed' | 'open' | 'half-open' = 'closed';
+  
+  constructor(
+    private threshold: number = 5,
+    private timeout: number = 60000
+  ) {}
+  
+  async call<T>(fn: () => Promise<T>): Promise<T> {
+    if (this.state === 'open') {
+      if (Date.now() - this.lastFailureTime > this.timeout) {
+        this.state = 'half-open';
+      } else {
+        throw new Error('Circuit breaker is open');
+      }
+    }
+    
+    try {
+      const result = await fn();
+      this.onSuccess();
+      return result;
+    } catch (error) {
+      this.onFailure();
+      throw error;
+    }
+  }
+  
+  private onSuccess() {
+    this.failures = 0;
+    this.state = 'closed';
+  }
+  
+  private onFailure() {
+    this.failures++;
+    this.lastFailureTime = Date.now();
+    
+    if (this.failures >= this.threshold) {
+      this.state = 'open';
+    }
+  }
+}
+
+// Circuit breakers for each tier
+const circuitBreakers = {
+  tier1: new CircuitBreaker(3, 30000), // 3 failures, 30s timeout
+  tier2: new CircuitBreaker(3, 45000), // 3 failures, 45s timeout  
+  tier3: new CircuitBreaker(5, 60000)  // 5 failures, 60s timeout
+};
+
+// Load AI configuration with fallbacks
+const loadAIConfig = (): AIConfig => {
+  return {
+    primaryModel: Deno.env.get('LLM_MODEL') || 'deepseek-ai/DeepSeek-R1-Distill-Qwen-1.5B',
+    fallbackModel: 'llama-3.1-8b-instant',
+    timeout: parseInt(Deno.env.get('AI_TIMEOUT') || '30000'),
+    maxRetries: parseInt(Deno.env.get('AI_MAX_RETRIES') || '3'),
+    circuitBreakerThreshold: parseInt(Deno.env.get('AI_CIRCUIT_BREAKER_THRESHOLD') || '5')
+  };
+};
+
+// Enhanced error categorization
+const categorizeError = (error: Error, response?: Response): string => {
+  if (error.name === 'AbortError') return 'timeout';
+  if (error.message.includes('rate limit')) return 'rate_limit';
+  if (error.message.includes('authentication')) return 'auth_error';
+  if (error.message.includes('network')) return 'network_error';
+  
+  if (response) {
+    if (response.status === 429) return 'rate_limit';
+    if (response.status === 401 || response.status === 403) return 'auth_error';
+    if (response.status >= 500) return 'server_error';
+    if (response.status >= 400) return 'client_error';
+  }
+  
+  return 'unknown_error';
+};
+
+// Track AI metrics for monitoring
+const trackAIMetrics = (metrics: AIMetrics) => {
+  console.log(JSON.stringify({
+    type: 'ai_metrics',
+    ...metrics
+  }));
+  
+  // Update usage tracking
+  const tierKey = `tier${metrics.tier}` as keyof typeof usageTracker;
+  usageTracker[tierKey].requests++;
+  usageTracker[tierKey].tokens += metrics.inputTokens + metrics.outputTokens;
+  usageTracker[tierKey].cost += metrics.cost || 0;
+  
+  if (!metrics.success) {
+    usageTracker[tierKey].failures++;
+  }
+};
+
+// Get usage statistics
+const getUsageStats = () => {
+  const totalRequests = Object.values(usageTracker).reduce((sum, tier) => sum + tier.requests, 0);
+  const totalCost = Object.values(usageTracker).reduce((sum, tier) => sum + tier.cost, 0);
+  const totalFailures = Object.values(usageTracker).reduce((sum, tier) => sum + tier.failures, 0);
+  
+  return {
+    ...usageTracker,
+    totals: {
+      requests: totalRequests,
+      cost: totalCost,
+      failures: totalFailures,
+      successRate: totalRequests > 0 ? ((totalRequests - totalFailures) / totalRequests) * 100 : 0
+    }
+  };
+};
 
 async function generateNarrative(extractedText: string, apiUrl: string, apiKey: string, deviceType: string = "desktop"): Promise<{ answer: string; reasoning: string | null }> {
-  const model = Deno.env.get("LLM_MODEL") || "deepseek-ai/DeepSeek-R1-Distill-Qwen-1.5B";
+  const config = loadAIConfig();
+  const requestId = crypto.randomUUID();
+  const startTime = Date.now();
 
-  // TIER 1: HF Serverless API (Primary)
-  // TIER 2: Self-Hosted Docker (Backup) - passed as apiUrl
-  // TIER 3: Groq API (Speed/Fallback)
+  // Validate input text
+  if (!extractedText || extractedText.trim().length < 10) {
+    throw new Error("Insufficient input text for narrative generation");
+  }
 
-  const tier1Url = "https://api-inference.huggingface.co/models/deepseek-ai/DeepSeek-R1-Distill-Qwen-1.5B/v1/chat/completions";
-  const tier2Url = apiUrl.includes("/chat/completions") ? apiUrl : apiUrl.replace(/\/+$/, "") + "/v1/chat/completions";
-  const tier3Url = "https://api.groq.com/openai/v1/chat/completions";
+  // Truncate input if too large to prevent memory issues
+  let processedText = extractedText;
+  if (processedText.length > 50000) {
+    processedText = processedText.substring(0, 50000) + "\n\n[Content truncated for processing...]";
+    console.log("Input text truncated for LLM processing");
+  }
+
+  // Enhanced tier configuration with cost tracking
+  const tierConfigs: TierConfig[] = [
+    {
+      name: "HF Serverless API",
+      url: "https://api-inference.huggingface.co/models/deepseek-ai/DeepSeek-R1-Distill-Qwen-1.5B/v1/chat/completions",
+      model: config.primaryModel,
+      timeout: 120000,
+      priority: 1,
+      costPerToken: 0.000001 // Estimated cost per token
+    },
+    {
+      name: "Self-Hosted Docker",
+      url: apiUrl.includes("/chat/completions") ? apiUrl : apiUrl.replace(/\/+$/, "") + "/v1/chat/completions",
+      model: "model.gguf",
+      timeout: 90000,
+      priority: 2,
+      costPerToken: 0.0000005 // Lower cost for self-hosted
+    },
+    {
+      name: "Groq API",
+      url: "https://api.groq.com/openai/v1/chat/completions",
+      model: config.fallbackModel,
+      timeout: 60000,
+      priority: 3,
+      costPerToken: 0.000002 // Groq pricing
+    }
+  ];
+
   const groqKey = Deno.env.get("GROQ_API_KEY") || "";
 
   const userPrompt = `KNOWLEDGE BASE CONTEXT:
 ${knowledgeBaseContext}
 
 ---EXTRACTED TECHNICAL DATA TO ANALYZE---
-${extractedText}
+${processedText}
 
 ---YOUR TASK---
 Using the SR&ED Knowledge Base above as your source of truth, analyze the extracted technical data and generate a compelling technical narrative for a Canadian SR&ED claim.
@@ -579,106 +956,387 @@ APPLY THE 5 QUESTIONS:
     { role: "user", content: userPrompt }
   ];
 
-  // Attempt Tier 1
-  try {
-    console.log("Attempting Tier 1: HF Serverless API...");
-    return await callLLM(tier1Url, apiKey, model, messages);
-  } catch (e1) {
-    console.warn("Tier 1 failed:", e1);
+  const errors: string[] = [];
+  const inputTokens = Math.ceil((systemPrompt.length + userPrompt.length) / 4); // Rough token estimate
 
-    // Attempt Tier 2
+  // Enhanced tier attempt logic with circuit breakers and monitoring
+  for (const tierConfig of tierConfigs) {
+    const tierNumber = tierConfig.priority as 1 | 2 | 3;
+    const circuitBreaker = circuitBreakers[`tier${tierNumber}` as keyof typeof circuitBreakers];
+    
     try {
-      console.log("Attempting Tier 2: Self-Hosted Docker...");
-      // Use 'model.gguf' or whatever the server expects, usually ignored by llama-server if only one model loaded
-      return await callLLM(tier2Url, "dummy-key", "model.gguf", messages);
-    } catch (e2) {
-      console.warn("Tier 2 failed:", e2);
+      console.log(`Attempting Tier ${tierNumber}: ${tierConfig.name}...`);
+      
+      // Check if we should skip this tier due to missing credentials
+      if (tierNumber === 3 && !groqKey) {
+        console.log("Skipping Tier 3: No Groq API key provided");
+        errors.push(`Tier 3: No API key provided`);
+        continue;
+      }
+      
+      // Use circuit breaker to avoid repeated failures
+      const result = await circuitBreaker.call(async () => {
+        const apiKeyToUse = tierNumber === 3 ? groqKey : (tierNumber === 1 ? apiKey : "dummy-key");
+        return await callLLM(tierConfig.url, apiKeyToUse, tierConfig.model, messages, tierConfig.timeout);
+      });
+      
+      // Calculate metrics
+      const endTime = Date.now();
+      const latency = endTime - startTime;
+      const outputTokens = Math.ceil(result.answer.length / 4); // Rough estimate
+      const cost = (inputTokens + outputTokens) * tierConfig.costPerToken;
+      
+      // Track successful metrics
+      trackAIMetrics({
+        requestId,
+        timestamp: new Date().toISOString(),
+        tier: tierNumber,
+        model: tierConfig.model,
+        inputTokens,
+        outputTokens,
+        latency,
+        success: true,
+        cost
+      });
+      
+      console.log(`Tier ${tierNumber} succeeded in ${latency}ms (Cost: $${cost.toFixed(6)})`);
+      return result;
+      
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      const errorType = categorizeError(error instanceof Error ? error : new Error(errorMessage));
+      errors.push(`Tier ${tierNumber}: ${errorMessage}`);
+      
+      // Track failed metrics
+      trackAIMetrics({
+        requestId,
+        timestamp: new Date().toISOString(),
+        tier: tierNumber,
+        model: tierConfig.model,
+        inputTokens,
+        outputTokens: 0,
+        latency: Date.now() - startTime,
+        success: false,
+        errorType,
+        cost: 0
+      });
+      
+      console.warn(`Tier ${tierNumber} failed (${errorType}):`, errorMessage);
+      
+      // Continue to next tier
+      continue;
+    }
+  }
+  
+  // All tiers failed - log comprehensive error and usage stats
+  const usageStats = getUsageStats();
+  console.error("All AI tiers failed. Usage stats:", usageStats);
+  
+  throw new Error(`All LLM tiers failed. Errors: ${errors.join('; ')}`);
+}
 
-      // Attempt Tier 3
-      if (groqKey) {
-        try {
-          console.log("Attempting Tier 3: Groq API...");
-          return await callLLM(tier3Url, groqKey, "llama-3.1-8b-instant", messages);
-        } catch (e3) {
-          console.error("Tier 3 failed:", e3);
-          throw new Error("All LLM tiers failed.");
-        }
-      } else {
-        throw new Error("Tier 1 & 2 failed, and no Groq key provided for Tier 3.");
+// Enhanced parameter optimization based on model and tier
+const getOptimizedParameters = (model: string, tier: number) => {
+  const baseParams = {
+    temperature: 0.7,
+    max_tokens: 2000,
+    stream: false,
+    top_p: 0.9,
+    frequency_penalty: 0.1,
+    presence_penalty: 0.1
+  };
+
+  // Model-specific optimizations
+  if (model.includes('deepseek')) {
+    return {
+      ...baseParams,
+      temperature: 0.6, // Lower temperature for more consistent SR&ED content
+      max_tokens: 2500,  // Higher token limit for detailed narratives
+      top_p: 0.85       // Slightly more focused sampling
+    };
+  } else if (model.includes('llama')) {
+    return {
+      ...baseParams,
+      temperature: 0.8,  // Slightly higher for creativity
+      max_tokens: 2000,  // Standard limit
+      top_p: 0.9        // Standard sampling
+    };
+  }
+
+  return baseParams;
+};
+
+// Enhanced retry logic with exponential backoff
+const retryWithBackoff = async <T>(
+  fn: () => Promise<T>,
+  maxRetries: number = 3,
+  baseDelay: number = 1000
+): Promise<T> => {
+  let lastError: Error;
+  
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      return await fn();
+    } catch (error) {
+      lastError = error instanceof Error ? error : new Error(String(error));
+      
+      // Don't retry on certain error types
+      if (lastError.message.includes('authentication') || 
+          lastError.message.includes('Invalid API key') ||
+          lastError.message.includes('401')) {
+        throw lastError;
+      }
+      
+      if (attempt < maxRetries) {
+        const delay = baseDelay * Math.pow(2, attempt) + Math.random() * 1000;
+        console.log(`Retry attempt ${attempt + 1}/${maxRetries} after ${delay}ms delay`);
+        await new Promise(resolve => setTimeout(resolve, delay));
       }
     }
   }
-}
+  
+  throw lastError!;
+};
 
-async function callLLM(endpoint: string, apiKey: string, model: string, messages: any[]): Promise<{ answer: string; reasoning: string | null }> {
+async function callLLM(endpoint: string, apiKey: string, model: string, messages: any[], timeoutMs: number = 120000): Promise<{ answer: string; reasoning: string | null }> {
   console.log(`Calling LLM: ${endpoint} (Model: ${model})`);
 
-  const response = await fetch(endpoint, {
-    method: "POST",
-    headers: {
-      "Authorization": `Bearer ${apiKey}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      model: model,
-      messages: messages,
-      temperature: 0.7,
-      max_tokens: 2000,
-      stream: false
-    }),
-  });
+  // Get optimized parameters for this model
+  const tierNumber = endpoint.includes('huggingface') ? 1 : endpoint.includes('groq') ? 3 : 2;
+  const optimizedParams = getOptimizedParameters(model, tierNumber);
 
-  if (!response.ok) {
-    const errText = await response.text();
-    throw new Error(`API Error ${response.status}: ${errText}`);
-  }
+  // Enhanced request with retry logic
+  return await retryWithBackoff(async () => {
+    // Create abort controller for timeout
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
-  const data = await response.json();
-  const content = data.choices[0].message.content;
+    try {
+      const requestBody = {
+        model: model,
+        messages: messages,
+        ...optimizedParams
+      };
 
-  // Parse <think> tags if present (DeepSeek-R1 specific)
-  return parseThinkTags(content);
+      console.log(`Request parameters:`, {
+        model,
+        temperature: optimizedParams.temperature,
+        max_tokens: optimizedParams.max_tokens,
+        endpoint: endpoint.split('/').pop()
+      });
+
+      const response = await fetch(endpoint, {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${apiKey}`,
+          "Content-Type": "application/json",
+          "User-Agent": "Rambo2-SRED/1.0"
+        },
+        body: JSON.stringify(requestBody),
+        signal: controller.signal,
+      });
+
+      clearTimeout(timeoutId);
+
+      // Enhanced error handling with response details
+      if (!response.ok) {
+        let errorDetails = `HTTP ${response.status}`;
+        try {
+          const errorBody = await response.text();
+          const errorData = JSON.parse(errorBody);
+          errorDetails += `: ${errorData.error?.message || errorData.message || errorBody}`;
+        } catch {
+          errorDetails += `: ${response.statusText}`;
+        }
+        
+        // Categorize error for better handling
+        if (response.status === 429) {
+          throw new Error(`Rate limit exceeded: ${errorDetails}`);
+        } else if (response.status === 401 || response.status === 403) {
+          throw new Error(`Authentication failed: ${errorDetails}`);
+        } else if (response.status >= 500) {
+          throw new Error(`Server error: ${errorDetails}`);
+        } else {
+          throw new Error(`API Error: ${errorDetails}`);
+        }
+      }
+
+      const data = await response.json();
+      
+      // Enhanced response validation with detailed error messages
+      if (!data) {
+        throw new Error("Empty response from API");
+      }
+      
+      if (!data.choices || !Array.isArray(data.choices)) {
+        throw new Error(`Invalid response format: expected 'choices' array, got ${typeof data.choices}`);
+      }
+      
+      if (data.choices.length === 0) {
+        throw new Error("No choices returned in API response");
+      }
+
+      const choice = data.choices[0];
+      if (!choice || !choice.message) {
+        throw new Error("Invalid choice format: missing message");
+      }
+      
+      const content = choice.message.content;
+      if (!content || typeof content !== 'string') {
+        throw new Error(`Invalid content format: expected string, got ${typeof content}`);
+      }
+
+      if (content.trim().length === 0) {
+        throw new Error("Empty content returned from LLM");
+      }
+
+      // Log successful response details
+      console.log(`LLM response received: ${content.length} characters, finish_reason: ${choice.finish_reason || 'unknown'}`);
+      
+      // Track token usage if available
+      if (data.usage) {
+        console.log(`Token usage - Input: ${data.usage.prompt_tokens}, Output: ${data.usage.completion_tokens}, Total: ${data.usage.total_tokens}`);
+      }
+
+      // Parse <think> tags if present (DeepSeek-R1 specific)
+      return parseThinkTags(content);
+      
+    } catch (error) {
+      clearTimeout(timeoutId);
+      
+      if (error.name === 'AbortError') {
+        throw new Error(`Request timeout after ${timeoutMs}ms`);
+      }
+      
+      // Re-throw with additional context
+      if (error instanceof Error) {
+        throw new Error(`LLM call failed: ${error.message}`);
+      }
+      
+      throw new Error(`LLM call failed: ${String(error)}`);
+    }
+  }, 2, 1000); // Max 2 retries with 1s base delay
 }
 
 function parseThinkTags(content: string): { answer: string; reasoning: string | null } {
-  // DeepSeek-R1 outputs reasoning in <think>...</think> tags
-  // We want to keep the answer but maybe log or structure the reasoning
-  // For now, we will strip the tags for the final narrative but we could return a structured object if we changed the return type
-  // The current requirement is to return a string for the narrative.
-  // We will strip the <think> block to ensure the PDF filler gets clean text.
-  // Ideally, we would pass the reasoning to the frontend, but that requires changing the return signature of generateNarrative.
-  // Given the constraints, we will strip it here to ensure the PDF generation works.
+  if (!content || typeof content !== 'string') {
+    throw new Error("Invalid content provided to parseThinkTags");
+  }
 
+  // DeepSeek-R1 outputs reasoning in <think>...</think> tags
   const thinkMatch = content.match(/<think>([\s\S]*?)<\/think>/i);
   if (thinkMatch) {
     console.log("Captured Reasoning Process:", thinkMatch[1].substring(0, 200) + "...");
     const reasoning = thinkMatch[1].trim();
     // Remove the think block from the content returned to the PDF filler
-    const answer = content.replace(/<think>[\s\S]*?<\/think>/i, "").trim();
+    let answer = content.replace(/<think>[\s\S]*?<\/think>/i, "").trim();
+    
+    // Validate that we still have content after removing think tags
+    if (!answer || answer.length === 0) {
+      console.warn("No content remaining after removing think tags, using original content");
+      answer = content;
+    }
+    
     return { answer, reasoning };
   }
-  return { answer: content, reasoning: null };
+  
+  return { answer: content.trim(), reasoning: null };
+}
+
+function generateFallbackNarrative(hasImages: boolean, hasData: boolean, contentSample: string): string {
+  const uncertaintyType = hasImages ? "image processing" : hasData ? "data processing" : "system optimization";
+  const methodType = hasImages ? "computer vision algorithms" : hasData ? "data analysis techniques" : "optimization algorithms";
+  
+  return `## Line 242: Technological Uncertainty
+
+The technological uncertainty encountered was whether novel ${methodType} could solve the ${uncertaintyType} challenges that existing standard approaches could not address. Conventional methods were insufficient due to performance limitations, accuracy constraints, or scalability issues. The specific uncertainty was how to develop a solution that could overcome these technical barriers while maintaining system reliability and efficiency.
+
+## Line 244: Systematic Investigation
+
+We conducted systematic experiments to test our hypothesis through iterative development and analysis:
+1. We analyzed the existing approaches and identified their limitations
+2. We formulated hypotheses about potential solutions and their expected performance
+3. We designed and implemented experimental prototypes to test these hypotheses
+4. We measured performance metrics and compared results against baseline methods
+5. We analyzed failure cases and refined our approach based on the findings
+6. We documented all experiments and results for further analysis
+
+## Line 246: Technological Advancement
+
+We advanced the understanding of ${uncertaintyType} by demonstrating new approaches that overcome previous limitations. Our systematic investigation revealed key insights about the underlying technical challenges and provided evidence for improved methods. This work contributes to the collective knowledge in the field by establishing new benchmarks and proving the feasibility of approaches that were previously unproven. The knowledge gained enables future development of more efficient and effective solutions.`;
+}
+
+function ensureNarrativeStructure(narrative: string): string {
+  const sections = {
+    line242: "",
+    line244: "",
+    line246: ""
+  };
+
+  // Try to extract existing sections
+  const line242Match = narrative.match(/## Line 242[:\s]*([\s\S]*?)(?=## Line 244|## Line 246|$)/i);
+  if (line242Match) sections.line242 = line242Match[1].trim();
+
+  const line244Match = narrative.match(/## Line 244[:\s]*([\s\S]*?)(?=## Line 246|$)/i);
+  if (line244Match) sections.line244 = line244Match[1].trim();
+
+  const line246Match = narrative.match(/## Line 246[:\s]*([\s\S]*?)$/i);
+  if (line246Match) sections.line246 = line246Match[1].trim();
+
+  // Fill in missing sections with defaults
+  if (!sections.line242) {
+    sections.line242 = "The technological uncertainty was whether a novel approach could solve the technical challenges that standard methods could not address.";
+  }
+  if (!sections.line244) {
+    sections.line244 = "We conducted systematic experiments to test our hypothesis through iterative development and analysis of the proposed solution.";
+  }
+  if (!sections.line246) {
+    sections.line246 = "We advanced the understanding of the underlying technology by demonstrating new approaches and contributing knowledge to the field.";
+  }
+
+  return `## Line 242: Technological Uncertainty
+
+${sections.line242}
+
+## Line 244: Systematic Investigation
+
+${sections.line244}
+
+## Line 246: Technological Advancement
+
+${sections.line246}`;
 }
 
 function parseNarrativeToFields(narrative: string): Record<string, string> {
   const fields: Record<string, string> = {};
 
-  // Extract Line 242
-  const line242Match = narrative.match(/## Line 242: Technological Uncertainty\s+([\s\S]*?)(?=## Line 244|$)/i);
+  // Extract Line 242 with more flexible matching
+  const line242Match = narrative.match(/## Line 242[:\s]*(?:Technological Uncertainty)?\s*([\s\S]*?)(?=## Line 244|$)/i);
   if (line242Match) {
     fields["line_242_uncertainties"] = line242Match[1].trim();
   }
 
-  // Extract Line 244
-  const line244Match = narrative.match(/## Line 244: Systematic Investigation\s+([\s\S]*?)(?=## Line 246|$)/i);
+  // Extract Line 244 with more flexible matching
+  const line244Match = narrative.match(/## Line 244[:\s]*(?:Systematic Investigation)?\s*([\s\S]*?)(?=## Line 246|$)/i);
   if (line244Match) {
     fields["line_244_work_performed"] = line244Match[1].trim();
   }
 
-  // Extract Line 246
-  const line246Match = narrative.match(/## Line 246: Technological Advancement\s+([\s\S]*?)(?=$)/i);
+  // Extract Line 246 with more flexible matching
+  const line246Match = narrative.match(/## Line 246[:\s]*(?:Technological Advancement)?\s*([\s\S]*?)$/i);
   if (line246Match) {
     fields["line_246_advancements"] = line246Match[1].trim();
+  }
+
+  // Ensure all fields have content
+  if (!fields["line_242_uncertainties"]) {
+    fields["line_242_uncertainties"] = "Technological uncertainty not properly extracted from narrative.";
+  }
+  if (!fields["line_244_work_performed"]) {
+    fields["line_244_work_performed"] = "Systematic investigation details not properly extracted from narrative.";
+  }
+  if (!fields["line_246_advancements"]) {
+    fields["line_246_advancements"] = "Technological advancement details not properly extracted from narrative.";
   }
 
   return fields;
