@@ -197,18 +197,17 @@ node scripts/upload_mapping.js
 **Solutions:**
 
 ```bash
-# Test AI endpoints
-curl -X POST "https://api-inference.huggingface.co/models/deepseek-ai/DeepSeek-R1-Distill-Qwen-1.5B" \
-  -H "Authorization: Bearer $HF_TOKEN" \
+# Test OpenRouter (narrative model — replace model id as needed)
+curl -sS https://openrouter.ai/api/v1/chat/completions \
+  -H "Authorization: Bearer $OPENROUTER_API_KEY" \
   -H "Content-Type: application/json" \
-  -d '{"inputs": "test"}'
+  -d '{"model":"meta-llama/llama-3.1-8b-instruct","messages":[{"role":"user","content":"ping"}]}'
 
-# Check environment variables
-echo $HF_TOKEN
-echo $GROQ_API_KEY
+# Optional Groq fallback
+echo "$GROQ_API_KEY" | wc -c
 
-# Test fallback system
-node scripts/diagnostics/bug-reproduction-tool.js run backend ai-fallback
+# Supabase secrets (set in dashboard, not always in shell)
+# OPENROUTER_API_KEY, OPENROUTER_MODEL, OPENROUTER_VISION_MODEL, GROQ_API_KEY
 ```
 
 ### Database Issues

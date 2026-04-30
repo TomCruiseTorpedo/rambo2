@@ -1,4 +1,6 @@
 #!/bin/bash
+# DEPRECATED: Production stack uses OpenRouter + Supabase Edge Functions.
+# This script remains for anyone still self-hosting an OpenAI-compatible GGUF server on HF Spaces.
 
 # Usage: ./scripts/deploy_to_hf.sh <hf_username> <space_name>
 # Example: ./scripts/deploy_to_hf.sh TomCruiseMissile rambo2

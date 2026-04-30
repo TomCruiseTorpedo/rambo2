@@ -16,6 +16,7 @@ import { useEnhancedToast } from "@/hooks/useEnhancedToast";
 import { RetryHandler } from "@/utils/errorHandling";
 import { supabase } from "@/integrations/supabase/client";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { extractWithClientOcrFallback } from "@/utils/clientOcrPipeline";
 
 const Index = () => {
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
@@ -27,6 +28,7 @@ const Index = () => {
   const [results, setResults] = useState<any>(null);
   const [processMode, setProcessMode] = useState<"combined" | "separate">("combined");
   const [sessionHistory, setSessionHistory] = useState<HistoryItem[]>([]);
+  const [ocrSourceNote, setOcrSourceNote] = useState<string | null>(null);
   const [showTutorial, setShowTutorial] = useState(false);
   const { showError, showSuccess, showWarning, showNetworkError, showProcessingError, showApiLimitError } = useEnhancedToast();
   const isMobile = useIsMobile();
@@ -64,16 +66,67 @@ const Index = () => {
       await RetryHandler.withRetry(async () => {
         // Convert all files to base64 with metadata
         setProcessingStage('ocr');
+        setOcrSourceNote(null);
+        let usedAnyLocalOcr = false;
+        let localOcrReason: "rate_limit" | "cloud_failed" | null = null;
+        let ocrNoteForHistory: string | undefined;
+        let ocrFallbackToastShown = false;
         const files: Array<{ data: string, type: string, name: string }> = [];
         for (let i = 0; i < selectedFiles.length; i++) {
           setCurrentFileIndex(i + 1);
           try {
-            const fileData = await fileToBase64(selectedFiles[i]);
-            files.push(fileData);
+            const rawFile = selectedFiles[i];
+            const fileData = await fileToBase64(rawFile);
+            const isRasterOcr =
+              fileData.type.startsWith("image/") || fileData.type === "application/pdf";
+            if (isRasterOcr) {
+              const extracted = await extractWithClientOcrFallback(supabase, rawFile, fileData, {
+                onCloudOcr: () => setProcessingStage("ocr"),
+                onLocalOcr: (detail) => {
+                  setProcessingStage("ocr_fallback");
+                  setProcessingProgress(10 + ((i + 0.5) / selectedFiles.length) * 30);
+                  console.info("[OCR]", detail);
+                },
+                onFallbackNotice: (reason) => {
+                  usedAnyLocalOcr = true;
+                  localOcrReason = reason;
+                  if (ocrFallbackToastShown) return;
+                  ocrFallbackToastShown = true;
+                  if (reason === "rate_limit") {
+                    showWarning(
+                      "OCR quota reached",
+                      "Cloud OCR hit a rate or daily limit. Using free on-device OCR — slower; tables and layout may be less accurate.",
+                    );
+                  } else {
+                    showWarning(
+                      "Cloud OCR unavailable",
+                      "Using free on-device OCR (Tesseract). Results may miss complex tables compared with cloud OCR.",
+                    );
+                  }
+                },
+              });
+              if (!extracted.textBody.trim()) {
+                throw new Error(`No text extracted from "${rawFile.name}". Try a clearer scan or paste text manually.`);
+              }
+              files.push({
+                name: `${rawFile.name.replace(/\.[^.]+$/, "")}-extracted.txt`,
+                type: "text",
+                data: `## ${rawFile.name}\n\n${extracted.textBody}`,
+              });
+            } else {
+              files.push(fileData);
+            }
             setProcessingProgress(10 + ((i + 1) / selectedFiles.length) * 30);
           } catch (fileError) {
             throw new Error(`Failed to process file "${selectedFiles[i].name}": ${fileError instanceof Error ? fileError.message : 'Unknown error'}`);
           }
+        }
+        if (usedAnyLocalOcr) {
+          ocrNoteForHistory =
+            localOcrReason === "rate_limit"
+              ? "This run used on-device OCR after a cloud OCR quota or rate limit. Review output carefully for table accuracy."
+              : "This run used on-device OCR after cloud OCR failed. Review output carefully for table accuracy.";
+          setOcrSourceNote(ocrNoteForHistory);
         }
 
         // Guard: ensure payload isn't too large for the function
@@ -133,6 +186,7 @@ const Index = () => {
           timestamp: new Date().toLocaleString(),
           output: data.result,
           inputCount: inputCount,
+          ocrNote: ocrNoteForHistory,
         };
         setSessionHistory([newHistoryItem, ...sessionHistory]);
 
@@ -347,6 +401,7 @@ const Index = () => {
     setTextInput("");
     setResults(null);
     setProcessingProgress(0);
+    setOcrSourceNote(null);
   };
 
   const handleCancelProcessing = () => {
@@ -412,7 +467,7 @@ const Index = () => {
       <div className="container mx-auto px-3 sm:px-4 lg:px-6 py-4 sm:py-6 lg:py-8 max-w-7xl">
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6 lg:gap-8">
           {/* Main content area */}
-          <main id="main-content" className="lg:col-span-2 space-y-4 sm:space-y-6" role="main" aria-label="SR&ED narrative generation"
+          <main id="main-content" className="lg:col-span-2 space-y-4 sm:space-y-6" role="main" aria-label="SR&ED narrative generation">
             <Card className="p-4 sm:p-6 lg:p-8">
               <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-4 mb-4 sm:mb-6">
                 <div className="flex items-center gap-2 sm:gap-3">
@@ -455,8 +510,16 @@ const Index = () => {
                 <ProcessingStatus
                   stage={processingStage}
                   progress={processingProgress}
-                  currentItem={processingStage === 'ocr' && selectedFiles.length > 0 ? currentFileIndex : undefined}
-                  totalItems={processingStage === 'ocr' && selectedFiles.length > 0 ? selectedFiles.length : undefined}
+                  currentItem={
+                    (processingStage === "ocr" || processingStage === "ocr_fallback") && selectedFiles.length > 0
+                      ? currentFileIndex
+                      : undefined
+                  }
+                  totalItems={
+                    (processingStage === "ocr" || processingStage === "ocr_fallback") && selectedFiles.length > 0
+                      ? selectedFiles.length
+                      : undefined
+                  }
                   estimatedTime={Math.round((100 - processingProgress) / 100 * 60)}
                   onCancel={handleCancelProcessing}
                 />
@@ -467,6 +530,7 @@ const Index = () => {
                   results={results}
                   onReset={handleReset}
                   onResultsChange={setResults}
+                  ocrSourceNote={ocrSourceNote}
                 />
               )}
             </Card>

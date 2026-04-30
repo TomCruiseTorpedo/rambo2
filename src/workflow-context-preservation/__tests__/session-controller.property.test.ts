@@ -724,8 +724,7 @@ describe('Session Controller - Property Tests', () => {
             // Validate continuity
             const validation = sessionController.validateContinuity(oldState, newState);
             
-            // Verify regression is detected
-            expect(validation.continuityScore).toBeLessThan(0.9); // Not exact continuation
+            expect(validation.continuityScore).toBeLessThan(0.9);
             
             // Verify specific regression issues are reported
             const regressionIssues = validation.issues.filter(issue => 

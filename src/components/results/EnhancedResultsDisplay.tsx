@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { NarrativeSection } from "./NarrativeSection";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Download, Copy, ChevronDown, FileText, Lightbulb } from "lucide-react";
@@ -31,12 +32,14 @@ interface EnhancedResultsDisplayProps {
   results: EnhancedResult;
   onReset: () => void;
   onResultsChange?: (results: EnhancedResult) => void;
+  ocrSourceNote?: string | null;
 }
 
-export const EnhancedResultsDisplay = ({ 
-  results, 
+export const EnhancedResultsDisplay = ({
+  results,
   onReset,
-  onResultsChange 
+  onResultsChange,
+  ocrSourceNote,
 }: EnhancedResultsDisplayProps) => {
   const [showThinking, setShowThinking] = useState(false);
   const [currentResults, setCurrentResults] = useState(results);
@@ -625,6 +628,12 @@ export const EnhancedResultsDisplay = ({
 
   return (
     <div className="space-y-4 animate-fade-in">
+      {ocrSourceNote ? (
+        <Alert className="border-amber-500/50 bg-amber-500/10">
+          <Lightbulb className="h-4 w-4 text-amber-700" />
+          <AlertDescription className="text-sm text-amber-950 dark:text-amber-100">{ocrSourceNote}</AlertDescription>
+        </Alert>
+      ) : null}
       <Card className="p-4">
         <div className="flex items-center justify-between flex-wrap gap-2">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">

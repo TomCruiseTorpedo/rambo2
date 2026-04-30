@@ -71,6 +71,10 @@ export class SecurityManager {
 
     // Initialize audit log stream
     this.auditLogStream = fs.createWriteStream(this.config.auditLogPath, { flags: 'a' });
+    // Writes also emit 'error' on the stream; without a listener Node treats it as uncaught.
+    this.auditLogStream.on('error', () => {
+      /* logAuditEntry rejects separately; swallow duplicate stream errors */
+    });
   }
 
   /**

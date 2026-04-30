@@ -1,5 +1,5 @@
 import React from 'react';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, act } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { ErrorBoundary, withErrorBoundary } from '../ErrorBoundary';
 
@@ -106,14 +106,15 @@ describe('ErrorBoundary', () => {
     expect(screen.getByText('Something went wrong')).toBeInTheDocument();
 
     const tryAgainButtons = screen.getAllByRole('button', { name: /try again/i });
-    fireEvent.click(tryAgainButtons[0]);
-
-    // Rerender with no error
-    rerender(
-      <ErrorBoundary>
-        <ThrowError shouldThrow={false} />
-      </ErrorBoundary>
-    );
+    // Reset clears error state; child must not throw on the next render (same commit as rerender).
+    await act(async () => {
+      fireEvent.click(tryAgainButtons[tryAgainButtons.length - 1]);
+      rerender(
+        <ErrorBoundary>
+          <ThrowError shouldThrow={false} />
+        </ErrorBoundary>
+      );
+    });
 
     expect(screen.getByText('No error')).toBeInTheDocument();
   });

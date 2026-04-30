@@ -9,6 +9,8 @@ export interface HistoryItem {
   timestamp: string;
   output: string;
   inputCount: number;
+  /** Set when on-device OCR was used after cloud OCR failed or hit limits */
+  ocrNote?: string;
 }
 
 interface SessionHistoryProps {
@@ -98,6 +100,11 @@ export const SessionHistory = ({ history, onClear }: SessionHistoryProps) => {
                 <span className="text-xs sm:text-sm">Download</span>
               </Button>
             </div>
+            {item.ocrNote ? (
+              <p className="text-xs text-amber-800 dark:text-amber-200/90 px-3 sm:px-6 py-2 border-b bg-amber-500/5">
+                OCR: on-device fallback was used for this run.
+              </p>
+            ) : null}
             
             <ScrollArea className="max-h-[200px] sm:max-h-[300px]" aria-label={`Preview of narrative ${index + 1}`}>
               <div className="p-3 sm:p-6">

@@ -232,7 +232,8 @@ export class SessionController {
     const progressIssues = this.validateProgressContinuity(oldState.progress, newState.progress);
     issues.push(...progressIssues);
     if (progressIssues.length > 0) {
-      continuityScore -= Math.min(0.2, progressIssues.length * 0.05);
+      // Any progress regression must pull score below 0.9 (first issue deducts 0.11; more issues add up to a cap).
+      continuityScore -= Math.min(0.4, 0.11 + (progressIssues.length - 1) * 0.06);
     }
 
     // Validate document preservation

@@ -1,5 +1,5 @@
 import React from 'react';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, act } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { NetworkStatusIndicator } from '../NetworkStatusIndicator';
 
@@ -17,6 +17,12 @@ describe('NetworkStatusIndicator', () => {
   let mockGetStatus: any;
   let mockAddListener: any;
   let mockInit: any;
+
+  const emitNetwork = async (online: boolean) => {
+    await act(async () => {
+      networkListener(online);
+    });
+  };
 
   beforeEach(async () => {
     vi.clearAllMocks();
@@ -36,11 +42,14 @@ describe('NetworkStatusIndicator', () => {
     vi.restoreAllMocks();
   });
 
-  it('should not render anything when online and no status changes', () => {
+  it('should not render anything when online and no status changes', async () => {
     mockGetStatus.mockReturnValue(true);
-    
-    const { container } = render(<NetworkStatusIndicator />);
-    
+
+    let container: HTMLElement;
+    await act(async () => {
+      ({ container } = render(<NetworkStatusIndicator />));
+    });
+
     expect(container.firstChild).toBeNull();
     expect(mockInit).toHaveBeenCalled();
     expect(mockAddListener).toHaveBeenCalled();
@@ -48,12 +57,13 @@ describe('NetworkStatusIndicator', () => {
 
   it('should show offline alert when network goes offline', async () => {
     mockGetStatus.mockReturnValue(true);
-    
-    render(<NetworkStatusIndicator />);
-    
-    // Simulate going offline
-    networkListener(false);
-    
+
+    await act(async () => {
+      render(<NetworkStatusIndicator />);
+    });
+
+    await emitNetwork(false);
+
     await waitFor(() => {
       expect(screen.getByText('No Internet Connection')).toBeInTheDocument();
       expect(screen.getByText(/You're offline/)).toBeInTheDocument();
@@ -62,19 +72,19 @@ describe('NetworkStatusIndicator', () => {
 
   it('should show online alert when network comes back online', async () => {
     mockGetStatus.mockReturnValue(false);
-    
-    render(<NetworkStatusIndicator />);
-    
-    // Simulate going offline first
-    networkListener(false);
-    
+
+    await act(async () => {
+      render(<NetworkStatusIndicator />);
+    });
+
+    await emitNetwork(false);
+
     await waitFor(() => {
       expect(screen.getByText('No Internet Connection')).toBeInTheDocument();
     });
-    
-    // Simulate coming back online
-    networkListener(true);
-    
+
+    await emitNetwork(true);
+
     await waitFor(() => {
       expect(screen.getByText('Back Online')).toBeInTheDocument();
       expect(screen.getByText(/Your internet connection has been restored/)).toBeInTheDocument();
@@ -83,55 +93,57 @@ describe('NetworkStatusIndicator', () => {
 
   it('should hide online alert after 5 seconds', async () => {
     vi.useFakeTimers();
-    
-    mockGetStatus.mockReturnValue(false);
-    
-    render(<NetworkStatusIndicator />);
-    
-    // Simulate coming back online
-    networkListener(true);
-    
-    await waitFor(() => {
+    try {
+      mockGetStatus.mockReturnValue(false);
+
+      await act(async () => {
+        render(<NetworkStatusIndicator />);
+      });
+
+      await emitNetwork(true);
+
       expect(screen.getByText('Back Online')).toBeInTheDocument();
-    });
-    
-    // Fast-forward 5 seconds
-    vi.advanceTimersByTime(5000);
-    
-    await waitFor(() => {
+
+      await act(async () => {
+        vi.advanceTimersByTime(5100);
+      });
+
       expect(screen.queryByText('Back Online')).not.toBeInTheDocument();
-    });
-    
-    vi.useRealTimers();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('should show correct icons for online and offline states', async () => {
     mockGetStatus.mockReturnValue(true);
-    
-    render(<NetworkStatusIndicator />);
-    
-    // Go offline
-    networkListener(false);
-    
+
+    await act(async () => {
+      render(<NetworkStatusIndicator />);
+    });
+
+    await emitNetwork(false);
+
     await waitFor(() => {
       const offlineIcon = screen.getByTestId ? screen.queryByTestId('wifi-off-icon') : document.querySelector('[data-testid="wifi-off-icon"]');
       // Since we can't easily test Lucide icons, we'll check for the alert presence
       expect(screen.getByText('No Internet Connection')).toBeInTheDocument();
     });
-    
-    // Come back online
-    networkListener(true);
-    
+
+    await emitNetwork(true);
+
     await waitFor(() => {
       expect(screen.getByText('Back Online')).toBeInTheDocument();
     });
   });
 
-  it('should properly clean up listeners on unmount', () => {
+  it('should properly clean up listeners on unmount', async () => {
     const unsubscribe = vi.fn();
     mockAddListener.mockReturnValue(unsubscribe);
-    
-    const { unmount } = render(<NetworkStatusIndicator />);
+
+    let unmount: () => void;
+    await act(async () => {
+      ({ unmount } = render(<NetworkStatusIndicator />));
+    });
     
     unmount();
     
@@ -140,17 +152,21 @@ describe('NetworkStatusIndicator', () => {
 
   it('should handle rapid network state changes', async () => {
     mockGetStatus.mockReturnValue(true);
-    
-    render(<NetworkStatusIndicator />);
-    
-    // Rapid offline/online changes
-    networkListener(false);
-    networkListener(true);
-    networkListener(false);
-    networkListener(true);
-    
-    await waitFor(() => {
-      expect(screen.getByText('Back Online')).toBeInTheDocument();
+
+    await act(async () => {
+      render(<NetworkStatusIndicator />);
     });
+
+    await emitNetwork(false);
+    await emitNetwork(true);
+    await emitNetwork(false);
+    await emitNetwork(true);
+
+    await waitFor(
+      () => {
+        expect(screen.getByText('Back Online')).toBeInTheDocument();
+      },
+      { timeout: 4000 }
+    );
   });
 });

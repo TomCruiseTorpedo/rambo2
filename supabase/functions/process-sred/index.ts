@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import * as xlsx from "npm:xlsx@0.18.5";
 import { getEnhancedSupabaseClient } from "../shared/database-utils.ts";
+import { openRouterHeaders } from "../shared/openrouter-headers.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -330,9 +331,6 @@ serve(async (req) => {
         console.log("Database connectivity confirmed");
       }
 
-      const LLM_API_URL = Deno.env.get("LLM_API_URL") || "https://tomcruisemissile-rambo2.hf.space";
-      const LLM_API_KEY = Deno.env.get("LLM_API_KEY") || "dummy-key"; // Optional, depending on host
-
       const sourceTexts: string[] = [];
 
     // Add direct text input if provided
@@ -509,7 +507,7 @@ serve(async (req) => {
       for (let i = 0; i < sourceTexts.length; i++) {
         console.log(`Generating narrative ${i + 1}/${sourceTexts.length}`);
         try {
-          const { answer, reasoning: r } = await generateNarrative(sourceTexts[i], LLM_API_URL, LLM_API_KEY, deviceType);
+          const { answer, reasoning: r } = await generateNarrative(sourceTexts[i], deviceType);
           narratives.push(`### Narrative ${i + 1}\n\n${answer}`);
           if (r) reasoningParts.push(`### Reasoning ${i + 1}\n\n${r}`);
         } catch (narrativeError) {
@@ -532,7 +530,7 @@ serve(async (req) => {
       }
       
       try {
-        const response = await generateNarrative(combinedText, LLM_API_URL, LLM_API_KEY, deviceType);
+        const response = await generateNarrative(combinedText, deviceType);
         finalResult = response.answer;
         reasoning = response.reasoning;
       } catch (llmError) {
@@ -755,8 +753,8 @@ const circuitBreakers = {
 // Load AI configuration with fallbacks
 const loadAIConfig = (): AIConfig => {
   return {
-    primaryModel: Deno.env.get('LLM_MODEL') || 'deepseek-ai/DeepSeek-R1-Distill-Qwen-1.5B',
-    fallbackModel: 'llama-3.1-8b-instant',
+    primaryModel: Deno.env.get("OPENROUTER_MODEL") || Deno.env.get("LLM_MODEL") || "meta-llama/llama-3.1-8b-instruct",
+    fallbackModel: Deno.env.get("GROQ_MODEL") || "llama-3.1-8b-instant",
     timeout: parseInt(Deno.env.get('AI_TIMEOUT') || '30000'),
     maxRetries: parseInt(Deno.env.get('AI_MAX_RETRIES') || '3'),
     circuitBreakerThreshold: parseInt(Deno.env.get('AI_CIRCUIT_BREAKER_THRESHOLD') || '5')
@@ -815,7 +813,9 @@ const getUsageStats = () => {
   };
 };
 
-async function generateNarrative(extractedText: string, apiUrl: string, apiKey: string, deviceType: string = "desktop"): Promise<{ answer: string; reasoning: string | null }> {
+const OPENROUTER_CHAT_URL = "https://openrouter.ai/api/v1/chat/completions";
+
+async function generateNarrative(extractedText: string, deviceType: string = "desktop"): Promise<{ answer: string; reasoning: string | null }> {
   const config = loadAIConfig();
   const requestId = crypto.randomUUID();
   const startTime = Date.now();
@@ -832,32 +832,29 @@ async function generateNarrative(extractedText: string, apiUrl: string, apiKey: 
     console.log("Input text truncated for LLM processing");
   }
 
-  // Enhanced tier configuration with cost tracking
+  const openRouterKey = Deno.env.get("OPENROUTER_API_KEY") || "";
+  const openRouterModel =
+    Deno.env.get("OPENROUTER_MODEL") ||
+    Deno.env.get("LLM_MODEL") ||
+    "meta-llama/llama-3.1-8b-instruct";
+
   const tierConfigs: TierConfig[] = [
     {
-      name: "HF Serverless API",
-      url: "https://api-inference.huggingface.co/models/deepseek-ai/DeepSeek-R1-Distill-Qwen-1.5B/v1/chat/completions",
-      model: config.primaryModel,
+      name: "OpenRouter",
+      url: OPENROUTER_CHAT_URL,
+      model: openRouterModel,
       timeout: 120000,
       priority: 1,
-      costPerToken: 0.000001 // Estimated cost per token
-    },
-    {
-      name: "Self-Hosted Docker",
-      url: apiUrl.includes("/chat/completions") ? apiUrl : apiUrl.replace(/\/+$/, "") + "/v1/chat/completions",
-      model: "model.gguf",
-      timeout: 90000,
-      priority: 2,
-      costPerToken: 0.0000005 // Lower cost for self-hosted
+      costPerToken: 0.000001,
     },
     {
       name: "Groq API",
       url: "https://api.groq.com/openai/v1/chat/completions",
       model: config.fallbackModel,
       timeout: 60000,
-      priority: 3,
-      costPerToken: 0.000002 // Groq pricing
-    }
+      priority: 2,
+      costPerToken: 0.000002,
+    },
   ];
 
   const groqKey = Deno.env.get("GROQ_API_KEY") || "";
@@ -959,25 +956,28 @@ APPLY THE 5 QUESTIONS:
   const errors: string[] = [];
   const inputTokens = Math.ceil((systemPrompt.length + userPrompt.length) / 4); // Rough token estimate
 
-  // Enhanced tier attempt logic with circuit breakers and monitoring
+  // Tier attempt logic with circuit breakers and monitoring
   for (const tierConfig of tierConfigs) {
     const tierNumber = tierConfig.priority as 1 | 2 | 3;
     const circuitBreaker = circuitBreakers[`tier${tierNumber}` as keyof typeof circuitBreakers];
-    
+
     try {
       console.log(`Attempting Tier ${tierNumber}: ${tierConfig.name}...`);
-      
-      // Check if we should skip this tier due to missing credentials
-      if (tierNumber === 3 && !groqKey) {
-        console.log("Skipping Tier 3: No Groq API key provided");
-        errors.push(`Tier 3: No API key provided`);
+
+      if (tierNumber === 1 && !openRouterKey) {
+        console.log("Skipping Tier 1: No OPENROUTER_API_KEY");
+        errors.push(`Tier 1: No OpenRouter API key`);
         continue;
       }
-      
-      // Use circuit breaker to avoid repeated failures
+      if (tierNumber === 2 && !groqKey) {
+        console.log("Skipping Tier 2: No Groq API key");
+        errors.push(`Tier 2: No Groq API key`);
+        continue;
+      }
+
       const result = await circuitBreaker.call(async () => {
-        const apiKeyToUse = tierNumber === 3 ? groqKey : (tierNumber === 1 ? apiKey : "dummy-key");
-        return await callLLM(tierConfig.url, apiKeyToUse, tierConfig.model, messages, tierConfig.timeout);
+        const apiKeyToUse = tierNumber === 1 ? openRouterKey : groqKey;
+        return await callLLM(tierConfig.url, apiKeyToUse, tierConfig.model, messages, tierConfig.timeout, tierNumber === 1);
       });
       
       // Calculate metrics
@@ -1054,12 +1054,12 @@ const getOptimizedParameters = (model: string, tier: number) => {
       max_tokens: 2500,  // Higher token limit for detailed narratives
       top_p: 0.85       // Slightly more focused sampling
     };
-  } else if (model.includes('llama')) {
+  } else if (model.includes("llama") || model.includes("meta-llama")) {
     return {
       ...baseParams,
-      temperature: 0.8,  // Slightly higher for creativity
-      max_tokens: 2000,  // Standard limit
-      top_p: 0.9        // Standard sampling
+      temperature: 0.75,
+      max_tokens: 2000,
+      top_p: 0.9,
     };
   }
 
@@ -1098,16 +1098,20 @@ const retryWithBackoff = async <T>(
   throw lastError!;
 };
 
-async function callLLM(endpoint: string, apiKey: string, model: string, messages: any[], timeoutMs: number = 120000): Promise<{ answer: string; reasoning: string | null }> {
+async function callLLM(
+  endpoint: string,
+  apiKey: string,
+  model: string,
+  messages: any[],
+  timeoutMs: number = 120000,
+  useOpenRouter = false,
+): Promise<{ answer: string; reasoning: string | null }> {
   console.log(`Calling LLM: ${endpoint} (Model: ${model})`);
 
-  // Get optimized parameters for this model
-  const tierNumber = endpoint.includes('huggingface') ? 1 : endpoint.includes('groq') ? 3 : 2;
-  const optimizedParams = getOptimizedParameters(model, tierNumber);
+  const paramTier = useOpenRouter ? 1 : endpoint.includes("groq") ? 2 : 1;
+  const optimizedParams = getOptimizedParameters(model, paramTier);
 
-  // Enhanced request with retry logic
   return await retryWithBackoff(async () => {
-    // Create abort controller for timeout
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
@@ -1115,23 +1119,27 @@ async function callLLM(endpoint: string, apiKey: string, model: string, messages
       const requestBody = {
         model: model,
         messages: messages,
-        ...optimizedParams
+        ...optimizedParams,
       };
 
       console.log(`Request parameters:`, {
         model,
         temperature: optimizedParams.temperature,
         max_tokens: optimizedParams.max_tokens,
-        endpoint: endpoint.split('/').pop()
+        endpoint: endpoint.split("/").pop(),
       });
+
+      const headers = useOpenRouter
+        ? openRouterHeaders(apiKey, "Rambo2-SRED/1.0")
+        : {
+          Authorization: `Bearer ${apiKey}`,
+          "Content-Type": "application/json",
+          "User-Agent": "Rambo2-SRED/1.0",
+        };
 
       const response = await fetch(endpoint, {
         method: "POST",
-        headers: {
-          "Authorization": `Bearer ${apiKey}`,
-          "Content-Type": "application/json",
-          "User-Agent": "Rambo2-SRED/1.0"
-        },
+        headers,
         body: JSON.stringify(requestBody),
         signal: controller.signal,
       });
@@ -1219,17 +1227,20 @@ async function callLLM(endpoint: string, apiKey: string, model: string, messages
 }
 
 function parseThinkTags(content: string): { answer: string; reasoning: string | null } {
-  if (!content || typeof content !== 'string') {
+  if (!content || typeof content !== "string") {
     throw new Error("Invalid content provided to parseThinkTags");
   }
 
-  // DeepSeek-R1 outputs reasoning in <think>...</think> tags
-  const thinkMatch = content.match(/<think>([\s\S]*?)<\/think>/i);
+  const thinkMatch =
+    content.match(/<think>([\s\S]*?)<\/think>/i) ||
+    content.match(/<think>([\s\S]*?)<\/redacted_thinking>/i);
   if (thinkMatch) {
     console.log("Captured Reasoning Process:", thinkMatch[1].substring(0, 200) + "...");
     const reasoning = thinkMatch[1].trim();
-    // Remove the think block from the content returned to the PDF filler
-    let answer = content.replace(/<think>[\s\S]*?<\/think>/i, "").trim();
+    let answer = content
+      .replace(/<think>[\s\S]*?<\/think>/gi, "")
+      .replace(/<think>[\s\S]*?<\/redacted_thinking>/gi, "")
+      .trim();
     
     // Validate that we still have content after removing think tags
     if (!answer || answer.length === 0) {

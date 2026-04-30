@@ -1,4 +1,5 @@
 FROM ubuntu:22.04
+# DEPRECATED for production SR&ED GPT: use OpenRouter + Supabase Edge Functions instead.
 
 # Install dependencies
 RUN apt-get update && apt-get install -y \

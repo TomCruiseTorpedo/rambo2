@@ -20,8 +20,12 @@ export default defineConfig({
         '**/coverage/**'
       ]
     },
-    testTimeout: 30000,
-    hookTimeout: 30000
+    testTimeout: 20000,
+    hookTimeout: 15000,
+    teardownTimeout: 10000,
+    // Many fast-check property tests; cap workers so the suite doesn’t look “hung” on one long file.
+    maxWorkers: 4,
+    minWorkers: 1
   },
   resolve: {
     alias: {

@@ -321,12 +321,10 @@ describe('Security Integration', () => {
       const initialEntries = await system.getAuditEntries();
       expect(initialEntries.length).toBeGreaterThan(0);
       
-      // Cleanup entries (using 0 days to remove all)
       const removedCount = await system.cleanupAuditLog(0);
-      expect(removedCount).toBe(initialEntries.length);
-      
-      // Check that entries were removed
       const remainingEntries = await system.getAuditEntries();
+      expect(removedCount).toBeGreaterThan(0);
+      expect(removedCount + remainingEntries.length).toBe(initialEntries.length);
       expect(remainingEntries.length).toBe(0);
     });
 

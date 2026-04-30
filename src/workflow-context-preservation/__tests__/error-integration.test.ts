@@ -137,21 +137,15 @@ describe('Error Handling Integration', () => {
       expect(filePath).toBeDefined();
     });
 
-    it('should create emergency backup when normal compaction fails', async () => {
+    it('should still return valid compacted state for very large context flags', async () => {
       const workflowState = createTestWorkflowState('emergency-compaction-test');
-      
-      // Simulate a scenario where compaction might fail by creating extreme conditions
-      workflowState.contextSize = 1000000; // Very large context
-      
+      workflowState.contextSize = 1_000_000;
+
       const compactedState = await preservationEngine.compactWorkflowState(workflowState);
-      
+
       expect(compactedState).toBeDefined();
-      
-      // If compaction ratio is poor, it should still create a valid compacted state
-      if (compactedState.compressionRatio > 0.9) {
-        // This indicates emergency compaction was used
-        expect(compactedState.reconstructionMetadata.compressionAlgorithm).toContain('emergency');
-      }
+      expect(compactedState.reconstructionMetadata.compressionAlgorithm).toBe('intelligent-prioritization');
+      expect(compactedState.essentialData.workflowType).toBe(workflowState.type);
     });
   });
 

@@ -20,7 +20,7 @@ vi.mock('process', () => ({
     SUPABASE_URL: 'https://test.supabase.co',
     SUPABASE_ANON_KEY: 'test-key',
     VITE_SUPABASE_PUBLISHABLE_KEY: 'test-key',
-    HF_API_TOKEN: 'test-hf-token',
+    OPENROUTER_API_KEY: 'test-openrouter-key',
     GROQ_API_KEY: 'test-groq-key'
   }
 }));

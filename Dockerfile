@@ -1,4 +1,6 @@
 FROM ubuntu:22.04
+# DEPRECATED for this app: narrative + OCR run on OpenRouter via Supabase.
+# Kept as reference for a self-hosted llama.cpp / GGUF Space.
 
 # Install dependencies
 RUN apt-get update && apt-get install -y \

@@ -18,6 +18,11 @@ export interface CompactedState {
   essentialData: EssentialData;
   compressedContext: string;
   reconstructionMetadata: ReconstructionMetadata;
+  /**
+   * `compactedSize / originalSize` from reconstruction metadata vs full workflow JSON.
+   * Can exceed 1 when essential output + structured context is larger than a sparse original;
+   * see `reconstructionMetadata.reconstructionInstructions` when ratio > 1.
+   */
   compressionRatio: number;
   timestamp: Date;
 }

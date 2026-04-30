@@ -1,5 +1,6 @@
 import React from 'react';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { WizardFlow } from '../wizard/WizardFlow';
 
@@ -209,19 +210,28 @@ describe('WizardFlow', () => {
       toBlob: vi.fn((callback) => callback(new Blob(['test'], { type: 'image/png' })))
     };
     
-    vi.spyOn(document, 'createElement').mockReturnValue(mockCanvas as any);
-    
-    const demoButton = screen.getByRole('button', { name: /generate demo files/i });
-    fireEvent.click(demoButton);
-    
-    await waitFor(() => {
-      expect(mockOnFilesSelect).toHaveBeenCalledWith(
-        expect.arrayContaining([
-          expect.objectContaining({ name: 'experimental-log-table.png' }),
-          expect.objectContaining({ name: 'prototype-iterations-table.png' })
-        ])
+    const origCreate = document.createElement.bind(document);
+    const createSpy = vi
+      .spyOn(document, 'createElement')
+      .mockImplementation((tagName: string, options?: any) =>
+        tagName === 'canvas' ? (mockCanvas as any) : origCreate(tagName, options)
       );
-    });
+
+    try {
+      const demoButton = screen.getByRole('button', { name: /generate demo files/i });
+      fireEvent.click(demoButton);
+
+      await waitFor(() => {
+        expect(mockOnFilesSelect).toHaveBeenCalledWith(
+          expect.arrayContaining([
+            expect.objectContaining({ name: 'experimental-log-table.png' }),
+            expect.objectContaining({ name: 'prototype-iterations-table.png' })
+          ])
+        );
+      });
+    } finally {
+      createSpy.mockRestore();
+    }
   });
 
   it('should show correct input summary in final step', () => {
@@ -237,24 +247,26 @@ describe('WizardFlow', () => {
 
   it('should have proper accessibility attributes', () => {
     render(<WizardFlow {...defaultProps} />);
-    
-    // Check for proper ARIA labels and roles
-    expect(screen.getByRole('region', { name: /wizard-progress/i })).toBeInTheDocument();
+
+    expect(
+      screen.getByRole('region', { name: /Generate SR&ED Narrative/i })
+    ).toBeInTheDocument();
     expect(screen.getByRole('progressbar')).toHaveAttribute('aria-label');
     expect(screen.getByRole('tablist')).toHaveAttribute('aria-label');
   });
 
-  it('should handle tab navigation between input methods', () => {
+  it('should handle tab navigation between input methods', async () => {
+    const user = userEvent.setup();
     render(<WizardFlow {...defaultProps} />);
-    
-    const textTab = screen.getByRole('tab', { name: /text input/i });
-    fireEvent.click(textTab);
-    
-    expect(screen.getByTestId('text-input')).toBeInTheDocument();
-    
-    const fileTab = screen.getByRole('tab', { name: /file upload/i });
-    fireEvent.click(fileTab);
-    
-    expect(screen.getByTestId('file-upload')).toBeInTheDocument();
+
+    await user.click(screen.getByRole('tab', { name: /text input/i }));
+    await waitFor(() => {
+      expect(screen.getByTestId('text-input')).toBeInTheDocument();
+    });
+
+    await user.click(screen.getByRole('tab', { name: /file upload/i }));
+    await waitFor(() => {
+      expect(screen.getByTestId('file-upload')).toBeInTheDocument();
+    });
   });
 });

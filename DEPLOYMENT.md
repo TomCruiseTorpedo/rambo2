@@ -1,81 +1,57 @@
 # SR&ED GPT Deployment Guide
 
-## Phase 1: Vercel Configuration (Frontend)
+## Phase 1: Vercel (Frontend)
 
-You have already connected the repository. Now we need to inject the backend configuration.
+1. **Vercel Dashboard** → your project → **Settings** → **Environment Variables**.
+2. Add:
+   - `VITE_SUPABASE_URL` — Supabase project URL
+   - `VITE_SUPABASE_PUBLISHABLE_KEY` — anon/public key
+3. Redeploy so the bundle picks up variables.
 
-1.  **Go to Vercel Dashboard**: Navigate to your project on Vercel.
-2.  **Settings**: Click on the **Settings** tab.
-3.  **Environment Variables**: Select **Environment Variables** from the left menu.
-4.  **Add Variables**: Add the following key-value pairs (copy these from your Supabase project settings or local `.env`):
-    *   `VITE_SUPABASE_URL`: Your Supabase Project URL.
-    *   `VITE_SUPABASE_PUBLISHABLE_KEY`: Your Supabase Anon/Public Key.
-5.  **Redeploy**:
-    *   Go to the **Deployments** tab.
-    *   Click the three dots on the latest deployment -> **Redeploy**.
-    *   This ensures the new environment variables are baked into the build.
+`VITE_` values are public in the client; never put `OPENROUTER_API_KEY` here.
 
-## Phase 2: Hugging Face Spaces (AI Backend)
+## Phase 2: Supabase (Edge Functions & secrets)
 
-We will host the LLM (**Phi-3.5 Mini**) on Hugging Face Spaces using Docker.
+1. **Secrets** (Dashboard → Edge Functions / Secrets):
+   - `OPENROUTER_API_KEY` (required)
+   - `OPENROUTER_MODEL` — narrative chat model (OpenRouter id)
+   - `OPENROUTER_VISION_MODEL` — optional OCR model (default `baidu/qianfan-ocr-fast:free`)
+   - `GROQ_API_KEY` — optional narrative fallback
+   - `GROQ_MODEL` — optional (default `llama-3.1-8b-instant`)
+   - `OPENROUTER_HTTP_REFERER`, `OPENROUTER_APP_TITLE` — optional; sent as standard `Referer` and `X-Title` on OpenRouter requests
 
-1.  **Create a Space**:
-    *   Go to [huggingface.co/spaces](https://huggingface.co/spaces).
-    *   Click **Create new Space**.
-    *   **Name**: `rambo2` (matches your repo).
-    *   **License**: Apache 2.0 (or MIT).
-    *   **SDK**: Select **Docker**.
-    *   **Template**: Blank.
-    *   **Visibility**: Public or Private.
+2. **Deploy functions**:
 
-2.  **Upload Docker Files**:
-    You need to upload the contents of the `docker` folder from this repo to the root of your Space.
-    *   **Option A (Web UI)**:
-        *   In your new Space, go to **Files**.
-        *   Click **Add file** -> **Upload files**.
-        *   Upload `docker/Dockerfile` and `docker/start.sh`.
-        *   **Important**: Ensure `Dockerfile` is at the root of the Space, not in a `docker` subfolder.
-    *   **Option B (Git)**:
-        *   Clone the Space locally: `git clone https://huggingface.co/spaces/TomCruiseMissile/rambo2`
-        *   Copy the contents of `rambo2/docker/*` to the Space folder.
-        *   `git add . && git commit -m "Init LLM" && git push`
+   ```sh
+   npx supabase functions deploy process-sred --no-verify-jwt
+   npx supabase functions deploy process-document-ocr --no-verify-jwt
+   npx supabase functions deploy fill-pdf-t661 --no-verify-jwt
+   ```
 
-3.  **Verify Deployment**:
-    *   The Space will start building. It might take a few minutes to download the model.
-    *   Once "Running", you will see an API endpoint: `https://tomcruisemissile-rambo2.hf.space`
+3. The browser calls these functions with the anon key; keys above stay server-side.
 
-## Phase 3: Connect Frontend to AI
+## Phase 3: OCR & client fallback
 
-Once the Space is running:
+- **Cloud OCR**: `process-document-ocr` uses OpenRouter (images as `image_url`; PDFs as `file` parts per OpenRouter multimodal API).
+- **Fallback**: the React app calls the same function first; on failure or `rate_limit`, it runs **Tesseract.js** locally and shows explicit toasts + UI notices.
 
-1.  **Update Supabase Env (Important)**:
-    *   Since the logic runs on Supabase Edge Functions, you need to set the secret there, not just in Vercel.
-    *   Go to your Supabase Dashboard -> Project Settings -> Edge Functions (or Secrets).
-    *   Add `LLM_API_URL` (or `OLLAMA_URL` - check your code).
-    *   Value: `https://tomcruisemissile-rambo2.hf.space`
-    *   *Note: This is the direct API endpoint derived from your Space URL.*
-    *   **Optional**: Add `LLM_MODEL` with value `phi3.5` (defaults to phi3.5 if unset).
+No Azure Document Intelligence configuration is required.
 
-2.  **Update Vercel Env**:
-    *   Go back to Vercel -> Settings -> Environment Variables.
-    *   Add `VITE_LLM_API_URL` (if your frontend needs it directly).
-    *   Value: `https://tomcruisemissile-rambo2.hf.space`
+## Security notes
 
-3.  **Redeploy Vercel**: Redeploy one last time to apply the AI endpoint.
+- **Supabase secrets**: private; used only in Edge Functions.
+- **Vercel**: only `VITE_SUPABASE_*` and other public config.
+- **OpenRouter**: monitor usage in the OpenRouter dashboard; free tiers have low RPM/daily caps.
 
-## Security Best Practices & Environment Variables
+## Manual product smoke (after deploy)
 
-### 1. Vercel (Frontend)
-*   **`VITE_` Prefix**: In Vite/Vercel, any variable starting with `VITE_` (like `VITE_SUPABASE_URL`) is **embedded into the public JavaScript bundle**. Anyone can see these.
-    *   **Safe**: `VITE_SUPABASE_URL`, `VITE_SUPABASE_PUBLISHABLE_KEY` (These are designed to be public; security is handled by Supabase Row Level Security).
-    *   **Unsafe**: Never put admin keys, database passwords, or the `LLM_API_URL` here if you want to keep the LLM private (though for this alpha, exposing the LLM URL is low risk).
-*   **Import .env**: Do **not** use this feature if it requires committing `.env` to GitHub. We explicitly git-ignored `.env` to protect you. Manually add variables in the Vercel Dashboard.
-*   **System Env Vars**: You can leave "Automatically expose System Environment Variables" checked; these are just Vercel metadata (like branch name) and are harmless.
+Quick pass to confirm OpenRouter + OCR + UI wiring:
 
-### 2. Supabase (Backend Logic)
-*   **Edge Function Secrets**: Variables set in **Supabase -> Settings -> Edge Functions** are **private**. They are never exposed to the browser.
-*   **Best Practice**: Store the `LLM_API_URL` and `LLM_MODEL` here. The frontend calls the Supabase Function, and the Function talks to the AI. This acts as a secure proxy, hiding the AI infrastructure from the public internet.
+1. Open the deployed app with devtools **Network** visible; confirm `process-sred` and `process-document-ocr` return **200** (not 401/500).
+2. Run the wizard with a **short text claim** — narrative sections populate without Groq-only errors in the function logs.
+3. Upload a **small PDF or image** — cloud OCR succeeds, or the UI shows the Tesseract fallback notice and still produces text.
+4. **Session history** — a completed run appears in history after refresh.
 
-### 3. Hugging Face (AI Host)
-*   **Visibility**: If your Space is "Public", anyone can query it. If "Private", you need to pass a Hugging Face Token in the header.
-*   **For this Alpha**: Keeping it "Public" (or "Unlisted") is easiest. If you make it Private, you must add `LLM_API_KEY` (your HF Token) to the Supabase Secrets so the Edge Function can authenticate.
+## Legacy
+
+Older docs referred to Hugging Face Spaces and `LLM_API_URL` / `LLM_API_KEY`. Those paths are removed; use OpenRouter secrets above.

@@ -29,11 +29,6 @@ describe('NarrativeSection', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.clearAllTimers();
-    vi.useFakeTimers();
-  });
-
-  afterEach(() => {
-    vi.useRealTimers();
   });
 
   it('should render with basic props', () => {
@@ -168,23 +163,19 @@ describe('NarrativeSection', () => {
   it('should show copied state temporarily after successful copy', async () => {
     const mockWriteText = vi.fn().mockResolvedValue(undefined);
     navigator.clipboard.writeText = mockWriteText;
-    
+
     render(<NarrativeSection {...defaultProps} />);
-    
-    const copyButton = screen.getByRole('button', { name: /copy/i });
-    fireEvent.click(copyButton);
-    
+
+    fireEvent.click(screen.getByRole('button', { name: /copy/i }));
+
+    expect(await screen.findByText('Copied!')).toBeInTheDocument();
+
+    await new Promise((r) => setTimeout(r, 2100));
+
     await waitFor(() => {
-      expect(screen.getByText('Copied!')).toBeInTheDocument();
-    }, { timeout: 5000 });
-    
-    // Fast-forward 2 seconds
-    vi.advanceTimersByTime(2000);
-    
-    await waitFor(() => {
-      expect(screen.getByText('Copy')).toBeInTheDocument();
       expect(screen.queryByText('Copied!')).not.toBeInTheDocument();
-    }, { timeout: 5000 });
+    });
+    expect(screen.getByRole('button', { name: /copy/i })).toBeInTheDocument();
   });
 
   it('should handle copy failure gracefully', async () => {
@@ -201,17 +192,28 @@ describe('NarrativeSection', () => {
     }, { timeout: 5000 });
   });
 
-  it('should disable copy button while copying', () => {
-    const mockWriteText = vi.fn(() => new Promise(resolve => setTimeout(resolve, 1000)));
+  it('should disable copy button while copying', async () => {
+    let finishCopy: () => void;
+    const mockWriteText = vi.fn(
+      () =>
+        new Promise<void>((resolve) => {
+          finishCopy = resolve;
+        })
+    );
     navigator.clipboard.writeText = mockWriteText;
-    
+
     render(<NarrativeSection {...defaultProps} />);
-    
+
     const copyButton = screen.getByRole('button', { name: /copy/i });
     fireEvent.click(copyButton);
-    
+
     expect(copyButton).toBeDisabled();
     expect(screen.getByText('Copying...')).toBeInTheDocument();
+
+    finishCopy!();
+    await waitFor(() => {
+      expect(copyButton).not.toBeDisabled();
+    });
   });
 
   it('should handle empty content gracefully', () => {
@@ -228,9 +230,15 @@ describe('NarrativeSection', () => {
 
   it('should preserve whitespace in content display', () => {
     const contentWithWhitespace = 'Line 1\n\nLine 2\n  Indented line';
-    render(<NarrativeSection {...defaultProps} content={contentWithWhitespace} />);
-    
-    const contentElement = screen.getByText(/Line 1/);
-    expect(contentElement).toHaveClass('whitespace-pre-wrap');
+    const { container } = render(
+      <NarrativeSection
+        {...defaultProps}
+        lineNumber="99"
+        content={contentWithWhitespace}
+      />
+    );
+
+    const contentElement = container.querySelector('.whitespace-pre-wrap');
+    expect(contentElement?.textContent).toBe(contentWithWhitespace);
   });
 });

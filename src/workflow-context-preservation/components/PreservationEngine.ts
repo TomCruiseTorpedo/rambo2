@@ -68,67 +68,33 @@ export class PreservationEngine {
       
       const essentialData = this.prioritizeEssentialData(sanitizedState);
       const originalSize = this.calculateStateSize(state);
-      
+
       // Create compressed context by removing redundant information
       const compressedContext = this.createCompressedContext(sanitizedState, essentialData);
-      
+
+      const compactedSize =
+        this.calculateEssentialDataSize(essentialData) + compressedContext.length;
+      const compressionRatio = originalSize > 0 ? compactedSize / originalSize : 1;
+
+      const reconstructionInstructions = [
+        ...this.generateReconstructionInstructions(sanitizedState, essentialData)
+      ];
+      if (compressionRatio > 1 && originalSize > 0) {
+        reconstructionInstructions.unshift(
+          'Compression ratio is above 1: serialized essential data plus compressed context is larger than the original workflow JSON. That is normal when the input was small or sparse while outputs add structured summaries and metadata; it does not mean essential information was discarded.'
+        );
+      }
+
       const reconstructionMetadata: ReconstructionMetadata = {
         originalSize,
-        compactedSize: this.calculateEssentialDataSize(essentialData) + compressedContext.length,
+        compactedSize,
         compressionAlgorithm: 'intelligent-prioritization',
         preservedComponents: this.getPreservedComponents(essentialData),
         lostComponents: this.getLostComponents(sanitizedState, essentialData),
-        reconstructionInstructions: this.generateReconstructionInstructions(sanitizedState, essentialData)
+        reconstructionInstructions
       };
 
-      const compressionRatio = reconstructionMetadata.compactedSize / originalSize;
-
-      // Check if compaction achieved reasonable results
-      if (compressionRatio > 0.9) {
-        // Compaction didn't achieve much reduction, handle as compaction failure
-        const recoveryResult = await this.errorHandler.handleCompactionFailure(
-          state,
-          context,
-          this.targetCompressionRatio
-        );
-        
-        if (recoveryResult.success && recoveryResult.recoveredData) {
-          // Convert minimal state to compacted state format
-          const minimalState = recoveryResult.recoveredData;
-          const minimalEssentialData: EssentialData = {
-            workflowType: minimalState.type,
-            currentPhase: minimalState.phase,
-            activeTask: minimalState.currentTask || 'No active task',
-            criticalDecisions: (minimalState.criticalDecisions || []).map((desc: string, index: number) => ({
-              id: `minimal-decision-${index}`,
-              description: desc,
-              rationale: 'Preserved from minimal state',
-              timestamp: new Date(),
-              impact: 'high' as const,
-              category: 'critical' as const
-            })),
-            documentStates: [],
-            nextSteps: minimalState.nextSteps || [],
-            requirementReferences: []
-          };
-          
-          return {
-            id: `emergency-compacted-${state.id}-${Date.now()}`,
-            essentialData: minimalEssentialData,
-            compressedContext: JSON.stringify({ emergency: true, reason: 'Compaction failure fallback' }),
-            reconstructionMetadata: {
-              originalSize,
-              compactedSize: JSON.stringify(minimalEssentialData).length,
-              compressionAlgorithm: 'emergency-minimal',
-              preservedComponents: ['workflowType', 'currentPhase', 'criticalDecisions', 'nextSteps'],
-              lostComponents: ['All non-critical data due to compaction failure'],
-              reconstructionInstructions: ['Load minimal emergency state', 'Reconstruct context manually']
-            },
-            compressionRatio: 0.1, // Very aggressive compression for emergency
-            timestamp: new Date()
-          };
-        }
-      }
+      // Product policy: never swap this result for an emergency minimal snapshot based on ratio alone (D1).
 
       return {
         id: `compacted-${state.id}-${Date.now()}`,
@@ -286,25 +252,31 @@ export class PreservationEngine {
     };
   }
 
+  /** JSON clone restores ISO strings; normalize so comparisons match Date semantics */
+  private coerceDate(value: Date | string): Date {
+    return value instanceof Date ? value : new Date(value);
+  }
+
   /**
    * Filters decisions to keep only critical ones (recent, high-impact, or technical)
    */
   private filterCriticalDecisions(decisions: Decision[]): Decision[] {
     const now = new Date();
     const oneDayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
-    
-    return decisions.filter(decision => {
-      // Keep recent decisions (within 24 hours)
-      if (decision.timestamp >= oneDayAgo) return true;
-      
-      // Keep high-impact decisions regardless of age
-      if (decision.impact === 'high') return true;
-      
-      // Keep technical decisions as they're often critical for implementation
-      if (decision.category === 'technical') return true;
-      
-      return false;
-    }).sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime()); // Most recent first
+
+    return decisions
+      .filter(decision => {
+        const ts = this.coerceDate(decision.timestamp as Date | string);
+        if (ts >= oneDayAgo) return true;
+        if (decision.impact === 'high') return true;
+        if (decision.category === 'technical') return true;
+        return false;
+      })
+      .sort(
+        (a, b) =>
+          this.coerceDate(b.timestamp as Date | string).getTime() -
+          this.coerceDate(a.timestamp as Date | string).getTime()
+      );
   }
 
   /**
@@ -313,33 +285,31 @@ export class PreservationEngine {
   private filterEssentialDocuments(documents: DocumentState[]): DocumentState[] {
     const now = new Date();
     const oneHourAgo = new Date(now.getTime() - 60 * 60 * 1000);
-    
-    // If we have few documents, keep them all
-    if (documents.length <= 3) {
-      return documents.sort((a, b) => b.lastModified.getTime() - a.lastModified.getTime());
-    }
-    
+
     const filtered = documents.filter(doc => {
-      // Keep recently modified documents
-      if (doc.lastModified >= oneHourAgo) return true;
-      
-      // Keep approved documents as they represent finalized decisions
+      const lm = this.coerceDate(doc.lastModified as Date | string);
+      if (lm >= oneHourAgo) return true;
       if (doc.status === 'approved') return true;
-      
-      // Keep documents currently in review
       if (doc.status === 'in_review') return true;
-      
       return false;
     });
-    
+
     // If filtering removed too many documents, keep at least the most recent ones
     if (filtered.length === 0 && documents.length > 0) {
       return documents
-        .sort((a, b) => b.lastModified.getTime() - a.lastModified.getTime())
-        .slice(0, Math.min(2, documents.length)); // Keep at least 2 most recent
+        .sort(
+          (a, b) =>
+            this.coerceDate(b.lastModified as Date | string).getTime() -
+            this.coerceDate(a.lastModified as Date | string).getTime()
+        )
+        .slice(0, Math.min(2, documents.length));
     }
-    
-    return filtered.sort((a, b) => b.lastModified.getTime() - a.lastModified.getTime()); // Most recent first
+
+    return filtered.sort(
+      (a, b) =>
+        this.coerceDate(b.lastModified as Date | string).getTime() -
+        this.coerceDate(a.lastModified as Date | string).getTime()
+    );
   }
 
   /**

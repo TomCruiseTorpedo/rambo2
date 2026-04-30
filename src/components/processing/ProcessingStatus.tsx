@@ -17,7 +17,7 @@ import { useState, useEffect } from "react";
 import { NetworkMonitor } from "@/utils/errorHandling";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 
-export type ProcessingStage = 'uploading' | 'ocr' | 'analyzing' | 'generating' | 'complete';
+export type ProcessingStage = 'uploading' | 'ocr' | 'ocr_fallback' | 'analyzing' | 'generating' | 'complete';
 
 interface ProcessingStatusProps {
   stage: ProcessingStage;
@@ -32,7 +32,8 @@ interface ProcessingStatusProps {
 
 const stageMessages: Record<ProcessingStage, string> = {
   uploading: 'Uploading files...',
-  ocr: 'Extracting text from images...',
+  ocr: 'Cloud OCR (OpenRouter)...',
+  ocr_fallback: 'Free on-device OCR (Tesseract) — may be slower',
   analyzing: 'Analyzing with AI...',
   generating: 'Generating SR&ED narrative...',
   complete: 'Complete!'

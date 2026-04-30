@@ -1,183 +1,166 @@
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { openRouterHeaders } from "../shared/openrouter-headers.ts";
 
 const corsHeaders = {
-    'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-}
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+};
+
+const OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions";
 
 interface OCRRequest {
-    imageData: string; // base64 encoded image
-    imageType: string; // mime type
-    fileName: string;
+  imageData: string;
+  imageType: string;
+  fileName: string;
+}
+
+function isRateLimited(status: number, body: string): boolean {
+  if (status === 429) return true;
+  try {
+    const j = JSON.parse(body);
+    const msg = (j.error?.message || j.message || "").toLowerCase();
+    return msg.includes("rate") && msg.includes("limit");
+  } catch {
+    return false;
+  }
 }
 
 serve(async (req) => {
-    // Handle CORS preflight requests
-    if (req.method === 'OPTIONS') {
-        return new Response('ok', { headers: corsHeaders })
+  if (req.method === "OPTIONS") {
+    return new Response("ok", { headers: corsHeaders });
+  }
+
+  try {
+    const { imageData, imageType, fileName }: OCRRequest = await req.json();
+
+    const apiKey = Deno.env.get("OPENROUTER_API_KEY");
+    if (!apiKey) {
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: "OPENROUTER_API_KEY not configured",
+          code: "config",
+        }),
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
     }
 
+    const visionModel =
+      Deno.env.get("OPENROUTER_VISION_MODEL") || "baidu/qianfan-ocr-fast:free";
+
+    const ocrInstruction =
+      "Transcribe all visible text from this document. Preserve reading order, headings, and bullet lists. " +
+      "Represent tables as markdown tables when possible. Output only the extracted text/markdown, no preamble.";
+
+    let userContent: Array<Record<string, unknown>>;
+
+    if (imageType === "application/pdf") {
+      const dataUrl = `data:application/pdf;base64,${imageData}`;
+      userContent = [
+        { type: "text", text: ocrInstruction },
+        {
+          type: "file",
+          file: {
+            filename: fileName || "document.pdf",
+            file_data: dataUrl,
+          },
+        },
+      ];
+    } else if (imageType.startsWith("image/")) {
+      const mime = imageType || "image/jpeg";
+      const dataUrl = `data:${mime};base64,${imageData}`;
+      userContent = [
+        { type: "text", text: ocrInstruction },
+        {
+          type: "image_url",
+          image_url: { url: dataUrl },
+        },
+      ];
+    } else {
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: `Unsupported type for OCR: ${imageType}`,
+          code: "unsupported",
+        }),
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
+
+    console.log(`OpenRouter OCR: ${fileName} (${imageType}) model=${visionModel}`);
+
+    const orRes = await fetch(OPENROUTER_URL, {
+      method: "POST",
+      headers: openRouterHeaders(apiKey, "Rambo2-SRED-OCR/1.0"),
+      body: JSON.stringify({
+        model: visionModel,
+        messages: [
+          {
+            role: "user",
+            content: userContent,
+          },
+        ],
+        temperature: 0.1,
+        max_tokens: 4096,
+      }),
+    });
+
+    const rawText = await orRes.text();
+    if (!orRes.ok) {
+      const code = isRateLimited(orRes.status, rawText) ? "rate_limit" : "provider_error";
+      console.error(`OpenRouter OCR error ${orRes.status}:`, rawText.slice(0, 500));
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: `OpenRouter OCR failed: ${orRes.status} ${rawText.slice(0, 300)}`,
+          code,
+        }),
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
+
+    let data: { choices?: Array<{ message?: { content?: string } }> };
     try {
-        const { imageData, imageType, fileName }: OCRRequest = await req.json()
-
-        // Azure Document Intelligence credentials
-        const azureEndpoint = Deno.env.get('AZURE_DOC_INTEL_ENDPOINT')
-        const azureKey = Deno.env.get('AZURE_DOC_INTEL_KEY')
-
-        if (!azureEndpoint || !azureKey) {
-            throw new Error('Azure Document Intelligence credentials not configured')
-        }
-
-        console.log(`Processing OCR for ${fileName}`)
-
-        // Convert base64 to binary
-        const binaryData = Uint8Array.from(atob(imageData), c => c.charCodeAt(0))
-
-        // Call Azure Document Intelligence Layout API
-        const analyzeUrl = `${azureEndpoint}/formrecognizer/documentModels/prebuilt-layout:analyze?api-version=2023-07-31`
-
-        const analyzeResponse = await fetch(analyzeUrl, {
-            method: 'POST',
-            headers: {
-                'Content-Type': imageType,
-                'Ocp-Apim-Subscription-Key': azureKey,
-            },
-            body: binaryData,
-        })
-
-        if (!analyzeResponse.ok) {
-            const errorText = await analyzeResponse.text()
-            throw new Error(`Azure API error: ${analyzeResponse.status} - ${errorText}`)
-        }
-
-        // Get the operation location from response headers
-        const operationLocation = analyzeResponse.headers.get('operation-location')
-        if (!operationLocation) {
-            throw new Error('No operation location returned from Azure')
-        }
-
-        console.log(`Azure operation started, polling for results...`)
-
-        // Poll for results
-        let resultResponse
-        let attempts = 0
-        const maxAttempts = 30 // 30 seconds max wait
-
-        while (attempts < maxAttempts) {
-            await new Promise(resolve => setTimeout(resolve, 1000)) // Wait 1 second
-
-            resultResponse = await fetch(operationLocation, {
-                headers: {
-                    'Ocp-Apim-Subscription-Key': azureKey,
-                },
-            })
-
-            const result = await resultResponse.json()
-
-            if (result.status === 'succeeded') {
-                console.log(`OCR completed for ${fileName}`)
-
-                // Convert Azure JSON to Markdown
-                const markdown = convertAzureResponseToMarkdown(result.analyzeResult)
-
-                return new Response(
-                    JSON.stringify({
-                        success: true,
-                        markdown,
-                        rawResult: result.analyzeResult, // Include raw for debugging
-                    }),
-                    {
-                        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-                        status: 200,
-                    },
-                )
-            } else if (result.status === 'failed') {
-                throw new Error(`OCR failed: ${result.error?.message || 'Unknown error'}`)
-            }
-
-            attempts++
-        }
-
-        throw new Error('OCR timeout - operation took too long')
-
-    } catch (error) {
-        console.error('OCR processing error:', error)
-        return new Response(
-            JSON.stringify({
-                success: false,
-                error: error.message,
-            }),
-            {
-                headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-                status: 500,
-            },
-        )
-    }
-})
-
-/**
- * Convert Azure Document Intelligence JSON response to clean Markdown
- * Preserves table structure and text hierarchy
- */
-function convertAzureResponseToMarkdown(analyzeResult: any): string {
-    const lines: string[] = []
-
-    // Extract paragraphs (text content)
-    if (analyzeResult.paragraphs) {
-        lines.push('## Extracted Text\n')
-        for (const para of analyzeResult.paragraphs) {
-            lines.push(para.content)
-            lines.push('') // Blank line between paragraphs
-        }
+      data = JSON.parse(rawText);
+    } catch {
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: "Invalid JSON from OpenRouter",
+          code: "provider_error",
+        }),
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
     }
 
-    // Extract tables in Markdown format
-    if (analyzeResult.tables) {
-        lines.push('\n## Tables\n')
-        for (let tableIndex = 0; tableIndex < analyzeResult.tables.length; tableIndex++) {
-            const table = analyzeResult.tables[tableIndex]
-            lines.push(`### Table ${tableIndex + 1}\n`)
-
-            // Build markdown table
-            const markdown = buildMarkdownTable(table)
-            lines.push(markdown)
-            lines.push('') // Blank line after table
-        }
+    const content = data.choices?.[0]?.message?.content;
+    if (!content || typeof content !== "string" || !content.trim()) {
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: "Empty OCR response from model",
+          code: "provider_error",
+        }),
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
     }
 
-    return lines.join('\n')
-}
-
-/**
- * Build a Markdown table from Azure table structure
- */
-function buildMarkdownTable(table: any): string {
-    const rowCount = table.rowCount
-    const colCount = table.columnCount
-
-    // Initialize grid
-    const grid: string[][] = Array(rowCount).fill(null).map(() => Array(colCount).fill(''))
-
-    // Fill grid with cell content
-    for (const cell of table.cells) {
-        const rowIndex = cell.rowIndex
-        const colIndex = cell.columnIndex
-        grid[rowIndex][colIndex] = cell.content || ''
-    }
-
-    // Build markdown rows
-    const markdownRows: string[] = []
-
-    for (let row = 0; row < rowCount; row++) {
-        const rowContent = grid[row].map(cell => cell.trim()).join(' | ')
-        markdownRows.push(`| ${rowContent} |`)
-
-        // Add separator after first row (header)
-        if (row === 0) {
-            const separator = grid[row].map(() => '---').join(' | ')
-            markdownRows.push(`| ${separator} |`)
-        }
-    }
-
-    return markdownRows.join('\n')
-}
+    return new Response(
+      JSON.stringify({
+        success: true,
+        markdown: content.trim(),
+      }),
+      { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 },
+    );
+  } catch (error) {
+    console.error("OCR processing error:", error);
+    return new Response(
+      JSON.stringify({
+        success: false,
+        error: error instanceof Error ? error.message : String(error),
+        code: "error",
+      }),
+      { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 },
+    );
+  }
+});
