@@ -425,7 +425,8 @@ serve(async (req) => {
             file.name.endsWith(".xls") ||
             file.name.endsWith(".csv")
           ) {
-            // Excel/CSV file - parse with xlsx library (re-enabled with error handling)
+            // Spreadsheet parsing via Deno npm:xlsx (edge-only; not in frontend package.json).
+            // Known npm advisories on SheetJS — replace with a maintained parser when feasible.
             try {
               const buffer = Uint8Array.from(atob(file.data), (c) => c.charCodeAt(0));
               const workbook = xlsx.read(buffer, { type: "array" });
