@@ -35,14 +35,16 @@ Vendor-agnostic SR&ED narrative + T661 tooling:
    npm install
    ```
 
-3. Environment variables — create a `.env`:
+3. **Beads** (optional): the shipped app does not call Beads; `src/utils/beadsAPI.ts` is helper/agent tooling only. Some machines register a **git pre-commit** hook via the Beads CLI (`bd`) — often after you run `bd init` in a project, or from another repo’s workflow. If **your** commits fail with `no beads database found`, either run `bd init` in this repo root (install [Beads CLI](https://beads.dev/docs); optional `BEADS_BIN` e.g. `~/.vscode-beads/bin/bd`) or remove/skip the hook for this checkout (`git commit --no-verify`). Init may add or change `CLAUDE.md`, `.claude/`, and `AGENTS.md` — review before committing.
+
+4. Environment variables — create a `.env`:
 
    ```
    VITE_SUPABASE_URL=your_supabase_url
    VITE_SUPABASE_PUBLISHABLE_KEY=your_supabase_anon_key
    ```
 
-4. Supabase Edge secrets (Dashboard → Edge Functions → Secrets), required for production:
+5. Supabase Edge secrets (Dashboard → Edge Functions → Secrets), required for production:
 
    - `OPENROUTER_API_KEY` — required for OCR and narrative generation
    - `OPENROUTER_MODEL` — chat model id for SR&ED narrative (e.g. `openai/gpt-4o-mini` or a free-tier id)
@@ -51,7 +53,7 @@ Vendor-agnostic SR&ED narrative + T661 tooling:
    - `GROQ_MODEL` — optional; defaults to `llama-3.1-8b-instant`
    - `OPENROUTER_HTTP_REFERER` / `OPENROUTER_APP_TITLE` — optional OpenRouter attribution headers
 
-5. Dev server:
+6. Dev server:
 
    ```sh
    npm run dev
