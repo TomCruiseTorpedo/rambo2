@@ -15,8 +15,13 @@ coverage
 
 # Local Environment & Secrets
 .env
+.env.*
+!.env.example
 .env.local
 .env.*.local
+.env.supabase*
+*.secrets
+secrets.json
 env
 *.pem
 *.key
@@ -56,11 +61,29 @@ supabase/.temp/
 supabase/templates/Screenshots*/
 supabase/templates/*screenshots*/
 
-# AI Context & Memory
+# AI context (local IDE / Kiro — never commit)
 .ai_context/
+.kiro/
+.agent/
 
+# Agent harness memory — LOCAL ONLY on this public repo (never commit or push)
+.cline/
+.clinerules/
+.cursor/
+.claude/
+AGENTS.md
+CLAUDE.md
 
-
+# Beads — local issue DB and config (optional tooling; not part of the shipped app)
+.beads/
+.groupcode/
+group-code/
+.dolt/
+*.db
+.beads-credential-key
+kiro-upgrade.md
+ANTIGRAVITY_HANDOFF.md
+BEADS_V30_UPGRADE.md
 
 # Test outputs
 test_*.pdf
@@ -68,29 +91,3 @@ test_output*.txt
 final_output.pdf
 deploy_output.txt
 production_test_output.pdf
-
-# Local Development Tools (NOT for public repo)
-.beads/*
-!.beads/.gitignore
-!.beads/metadata.json
-!.beads/config.yaml
-.groupcode/
-group-code/
-kiro-upgrade.md
-ANTIGRAVITY_HANDOFF.md
-BEADS_V30_UPGRADE.md
-
-# IDE-specific directories
-.kiro/
-.agent/
-
-# Cursor — local harness state (parity: commit CLAUDE.md + .claude/ project settings; ignore ephemeral IDE state)
-.cursor/
-
-
-
-
-# Beads / Dolt files (added by bd init)
-.dolt/
-*.db
-.beads-credential-key

@@ -9,8 +9,12 @@ const corsHeaders = {
 };
 
 // Supabase configuration for internal function calls
-const SUPABASE_URL = Deno.env.get('SUPABASE_URL') || 'https://nvuxsdwpqrtglgxwrbqa.supabase.co';
+const SUPABASE_URL = Deno.env.get('SUPABASE_URL');
 const SUPABASE_ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY') || Deno.env.get('VITE_SUPABASE_PUBLISHABLE_KEY');
+
+if (!SUPABASE_URL) {
+  console.warn('SUPABASE_URL is not set; internal function calls may fail until configured.');
+}
 
 // Enhanced Supabase client for database operations
 const enhancedSupabase = getEnhancedSupabaseClient();

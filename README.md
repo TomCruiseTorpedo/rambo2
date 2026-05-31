@@ -35,9 +35,15 @@ Vendor-agnostic SR&ED narrative + T661 tooling:
    npm install
    ```
 
-3. **Beads** (optional): the shipped app does not call Beads; `src/utils/beadsAPI.ts` is helper/agent tooling only. Some machines register a **git pre-commit** hook via the Beads CLI (`bd`) — often after you run `bd init` in a project, or from another repo’s workflow. If **your** commits fail with `no beads database found`, either run `bd init` in this repo root (install [Beads CLI](https://beads.dev/docs); optional `BEADS_BIN` e.g. `~/.vscode-beads/bin/bd`) or remove/skip the hook for this checkout (`git commit --no-verify`). Init may add or change `CLAUDE.md`, `.claude/`, and `AGENTS.md` — review before committing.
+3. **Beads / agent memory (local only):** This is a **public** repo. Do **not** commit or push agent harness files — they are gitignored: `.cline/memory-bank/`, `.clinerules/`, `AGENTS.md`, `CLAUDE.md`, `.claude/`, `.cursor/`, `.beads/`. Copy `.env.example` → `.env` for app config. Beads (`bd`) is optional; the shipped app does not call it. If a pre-commit hook fails with `no beads database found`, run `bd init` locally or `git commit --no-verify`.
 
-4. Environment variables — create a `.env`:
+4. Environment variables — copy the template and fill in your values:
+
+   ```sh
+   cp .env.example .env
+   ```
+
+   Required for local frontend dev:
 
    ```
    VITE_SUPABASE_URL=your_supabase_url

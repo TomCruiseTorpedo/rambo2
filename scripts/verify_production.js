@@ -21,8 +21,13 @@ if (fs.existsSync(envPath)) {
     });
 }
 
-const SUPABASE_URL = "https://nvuxsdwpqrtglgxwrbqa.supabase.co";
+const SUPABASE_URL = env.VITE_SUPABASE_URL || env.SUPABASE_URL;
 const SUPABASE_ANON_KEY = env.VITE_SUPABASE_PUBLISHABLE_KEY;
+
+if (!SUPABASE_URL) {
+    console.error("❌ Missing VITE_SUPABASE_URL or SUPABASE_URL in env file");
+    process.exit(1);
+}
 
 if (!SUPABASE_ANON_KEY) {
     console.error("❌ Missing SUPABASE_ANON_KEY in env file");
