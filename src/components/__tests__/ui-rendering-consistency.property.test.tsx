@@ -12,7 +12,7 @@ import React from 'react';
 import { render, screen, fireEvent, cleanup } from '@testing-library/react';
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import * as fc from 'fast-check';
-import { MultiImageUpload } from '../MultiImageUpload';
+import { EnhancedMultiImageUpload } from '@/components/upload/EnhancedMultiImageUpload';
 import { ResultsDisplay } from '../ResultsDisplay';
 import { TextInput } from '../TextInput';
 import { SessionHistory, HistoryItem } from '../SessionHistory';
@@ -41,30 +41,23 @@ const historyItemGenerator = (): fc.Arbitrary<HistoryItem> =>
     inputCount: fc.integer({ min: 1, max: 10 })
   });
 
-const processModeGenerator = (): fc.Arbitrary<"combined" | "separate"> =>
-  fc.constantFrom("combined", "separate");
-
 describe('UI Component Rendering Consistency - Property Tests', () => {
   describe('Property 2: UI Component Rendering Consistency', () => {
-    it('should render MultiImageUpload consistently with various file arrays', () => {
+    it('should render EnhancedMultiImageUpload consistently with various file arrays', () => {
       fc.assert(
         fc.property(
           fc.array(fileGenerator(), { minLength: 0, maxLength: 5 }),
-          processModeGenerator(),
           fc.boolean(),
-          (files, processMode, disabled) => {
+          (files, disabled) => {
             const mockOnFilesSelect = vi.fn();
             const mockOnRemoveFile = vi.fn();
-            const mockOnProcessModeChange = vi.fn();
 
             const { container, unmount } = render(
-              <MultiImageUpload
+              <EnhancedMultiImageUpload
                 onFilesSelect={mockOnFilesSelect}
                 selectedFiles={files}
                 onRemoveFile={mockOnRemoveFile}
                 disabled={disabled}
-                processMode={processMode}
-                onProcessModeChange={mockOnProcessModeChange}
               />
             );
 
@@ -79,23 +72,13 @@ describe('UI Component Rendering Consistency - Property Tests', () => {
               // Should show file count correctly
               if (files.length > 0) {
                 const fileCountRegex = new RegExp(`${files.length} file`);
-                const fileCountElement = container.querySelector('*');
                 expect(container.textContent).toMatch(fileCountRegex);
               }
               
-              // Should show processing mode selector only when multiple files
-              if (files.length > 1) {
-                expect(container.textContent).toContain('Processing Mode');
-              }
-              
-              // Should have choose files button
-              const buttons = container.querySelectorAll('button');
-              const chooseButton = Array.from(buttons).find(btn => 
-                btn.textContent?.includes('Choose Files')
-              );
-              expect(chooseButton).toBeTruthy();
-              if (chooseButton) {
-                expect(chooseButton.disabled).toBe(disabled || false);
+              const uploadButton = container.querySelector('[role="button"][aria-label*="Upload files"]');
+              expect(uploadButton).toBeTruthy();
+              if (uploadButton) {
+                expect(uploadButton.getAttribute('tabIndex')).toBe(disabled ? '-1' : '0');
               }
             } finally {
               unmount();
@@ -166,13 +149,11 @@ describe('UI Component Rendering Consistency - Property Tests', () => {
             const tests = [
               () => {
                 const { unmount } = render(
-                  <MultiImageUpload
+                  <EnhancedMultiImageUpload
                     onFilesSelect={vi.fn()}
                     selectedFiles={files}
                     onRemoveFile={vi.fn()}
                     disabled={disabled}
-                    processMode="combined"
-                    onProcessModeChange={vi.fn()}
                   />
                 );
                 unmount();
@@ -228,12 +209,10 @@ describe('UI Component Rendering Consistency - Property Tests', () => {
 
             // Test that components have expected interactive elements
             const multiUpload = render(
-              <MultiImageUpload
+              <EnhancedMultiImageUpload
                 onFilesSelect={vi.fn()}
                 selectedFiles={files}
                 onRemoveFile={vi.fn()}
-                processMode="combined"
-                onProcessModeChange={vi.fn()}
               />
             );
 
@@ -286,7 +265,6 @@ describe('UI Component Rendering Consistency - Property Tests', () => {
           (fileSpecs) => {
             const mockOnFilesSelect = vi.fn();
             const mockOnRemoveFile = vi.fn();
-            const mockOnProcessModeChange = vi.fn();
 
             // Create actual File objects
             const files = fileSpecs.map(spec => {
@@ -295,12 +273,10 @@ describe('UI Component Rendering Consistency - Property Tests', () => {
             });
 
             const { container, unmount } = render(
-              <MultiImageUpload
+              <EnhancedMultiImageUpload
                 onFilesSelect={mockOnFilesSelect}
                 selectedFiles={[]}
                 onRemoveFile={mockOnRemoveFile}
-                processMode="combined"
-                onProcessModeChange={mockOnProcessModeChange}
               />
             );
 
@@ -375,7 +351,6 @@ describe('UI Component Rendering Consistency - Property Tests', () => {
           (fileSpecs) => {
             const mockOnFilesSelect = vi.fn();
             const mockOnRemoveFile = vi.fn();
-            const mockOnProcessModeChange = vi.fn();
 
             // Create files with various sizes
             const files = fileSpecs.map(spec => {
@@ -385,12 +360,10 @@ describe('UI Component Rendering Consistency - Property Tests', () => {
             });
 
             const { container, unmount } = render(
-              <MultiImageUpload
+              <EnhancedMultiImageUpload
                 onFilesSelect={mockOnFilesSelect}
                 selectedFiles={files}
                 onRemoveFile={mockOnRemoveFile}
-                processMode="combined"
-                onProcessModeChange={mockOnProcessModeChange}
               />
             );
 
@@ -416,13 +389,6 @@ describe('UI Component Rendering Consistency - Property Tests', () => {
                 expect(xButtons.length).toBeGreaterThanOrEqual(files.length);
               }
 
-              // Should show processing mode options for multiple files
-              if (files.length > 1) {
-                expect(container.textContent).toContain('Processing Mode');
-                expect(container.textContent).toContain('Combined Context');
-                expect(container.textContent).toContain('Separate Narratives');
-              }
-
             } finally {
               unmount();
             }
@@ -443,7 +409,6 @@ describe('UI Component Rendering Consistency - Property Tests', () => {
           ({ validImageCount, invalidFileCount, disabled }) => {
             const mockOnFilesSelect = vi.fn();
             const mockOnRemoveFile = vi.fn();
-            const mockOnProcessModeChange = vi.fn();
 
             // Create mix of valid and invalid files
             const validFiles = Array.from({ length: validImageCount }, (_, i) => 
@@ -457,13 +422,11 @@ describe('UI Component Rendering Consistency - Property Tests', () => {
             const allFiles = [...validFiles, ...invalidFiles];
 
             const { container, unmount } = render(
-              <MultiImageUpload
+              <EnhancedMultiImageUpload
                 onFilesSelect={mockOnFilesSelect}
                 selectedFiles={validFiles} // Only valid files should be in selectedFiles
                 onRemoveFile={mockOnRemoveFile}
                 disabled={disabled}
-                processMode="combined"
-                onProcessModeChange={mockOnProcessModeChange}
               />
             );
 
@@ -480,18 +443,18 @@ describe('UI Component Rendering Consistency - Property Tests', () => {
                 expect(uploadArea?.className).toContain('cursor-not-allowed');
               }
 
-              // File input should have correct attributes
+              // File input should reflect disabled state
               const fileInput = container.querySelector('input[type="file"]') as HTMLInputElement;
-              expect(fileInput?.accept).toBe('image/*');
+              expect(fileInput).toBeTruthy();
               expect(fileInput?.disabled).toBe(disabled || false);
 
-              // Choose Files button should reflect disabled state
-              const chooseButton = Array.from(container.querySelectorAll('button')).find(btn => 
-                btn.textContent?.includes('Choose Files')
-              );
-              expect(chooseButton?.disabled).toBe(disabled || false);
+              const uploadButton = container.querySelector('[role="button"][aria-label*="Upload files"]');
+              expect(uploadButton).toBeTruthy();
+              if (uploadButton) {
+                expect(uploadButton.getAttribute('tabIndex')).toBe(disabled ? '-1' : '0');
+              }
 
-              // Only valid image files should be displayed
+              // Only selected files should be displayed
               if (validImageCount > 0) {
                 expect(container.textContent).toMatch(new RegExp(`${validImageCount} file`));
                 validFiles.forEach(file => {
@@ -550,14 +513,12 @@ describe('UI Component Rendering Consistency - Property Tests', () => {
               inputCount: files.length || 1
             }] : [];
 
-            // Test MultiImageUpload responsive behavior
+            // Test EnhancedMultiImageUpload responsive behavior
             const multiUpload = render(
-              <MultiImageUpload
+              <EnhancedMultiImageUpload
                 onFilesSelect={vi.fn()}
                 selectedFiles={files}
                 onRemoveFile={vi.fn()}
-                processMode="combined"
-                onProcessModeChange={vi.fn()}
               />
             );
 
@@ -645,12 +606,10 @@ describe('UI Component Rendering Consistency - Property Tests', () => {
 
             const { container, unmount } = render(
               <div className="w-full">
-                <MultiImageUpload
+                <EnhancedMultiImageUpload
                   onFilesSelect={vi.fn()}
                   selectedFiles={files}
                   onRemoveFile={vi.fn()}
-                  processMode="combined"
-                  onProcessModeChange={vi.fn()}
                 />
                 <ResultsDisplay results={text} onReset={vi.fn()} />
               </div>
@@ -733,12 +692,10 @@ describe('UI Component Rendering Consistency - Property Tests', () => {
 
             const { container, unmount } = render(
               <div className="p-4">
-                <MultiImageUpload
+                <EnhancedMultiImageUpload
                   onFilesSelect={vi.fn()}
                   selectedFiles={files}
                   onRemoveFile={vi.fn()}
-                  processMode="combined"
-                  onProcessModeChange={vi.fn()}
                 />
                 <SessionHistory history={history} onClear={vi.fn()} />
               </div>
@@ -812,7 +769,6 @@ describe('UI Component Rendering Consistency - Property Tests', () => {
           ({ emptyFiles, oversizedFiles, invalidTypeFiles }) => {
             const mockOnFilesSelect = vi.fn();
             const mockOnRemoveFile = vi.fn();
-            const mockOnProcessModeChange = vi.fn();
 
             // Create problematic files for testing error messages
             const emptyFileObjects = emptyFiles.map(spec => 
@@ -846,12 +802,10 @@ describe('UI Component Rendering Consistency - Property Tests', () => {
             }
 
             const { container, unmount } = render(
-              <MultiImageUpload
+              <EnhancedMultiImageUpload
                 onFilesSelect={mockOnFilesSelect}
                 selectedFiles={[]}
                 onRemoveFile={mockOnRemoveFile}
-                processMode="combined"
-                onProcessModeChange={mockOnProcessModeChange}
               />
             );
 
@@ -930,7 +884,6 @@ describe('UI Component Rendering Consistency - Property Tests', () => {
           ({ duplicateFileName, fileCount, largeFileSize }) => {
             const mockOnFilesSelect = vi.fn();
             const mockOnRemoveFile = vi.fn();
-            const mockOnProcessModeChange = vi.fn();
 
             // Create scenarios that require recovery guidance
             const existingFile = new File(['existing'], duplicateFileName, { type: 'image/jpeg' });
@@ -944,12 +897,10 @@ describe('UI Component Rendering Consistency - Property Tests', () => {
             );
 
             const { container, unmount } = render(
-              <MultiImageUpload
+              <EnhancedMultiImageUpload
                 onFilesSelect={mockOnFilesSelect}
                 selectedFiles={[existingFile]} // Pre-existing file for duplicate test
                 onRemoveFile={mockOnRemoveFile}
-                processMode="combined"
-                onProcessModeChange={mockOnProcessModeChange}
               />
             );
 
@@ -1030,7 +981,6 @@ describe('UI Component Rendering Consistency - Property Tests', () => {
           (fileSpecs) => {
             const mockOnFilesSelect = vi.fn();
             const mockOnRemoveFile = vi.fn();
-            const mockOnProcessModeChange = vi.fn();
 
             // Create files with various problematic characteristics
             const problematicFiles = fileSpecs.map(spec => {
@@ -1045,12 +995,10 @@ describe('UI Component Rendering Consistency - Property Tests', () => {
             });
 
             const { container, unmount } = render(
-              <MultiImageUpload
+              <EnhancedMultiImageUpload
                 onFilesSelect={mockOnFilesSelect}
                 selectedFiles={[]}
                 onRemoveFile={mockOnRemoveFile}
-                processMode="combined"
-                onProcessModeChange={mockOnProcessModeChange}
               />
             );
 
@@ -1122,7 +1070,6 @@ describe('UI Component Rendering Consistency - Property Tests', () => {
           ({ errorType, fileName, contextInfo }) => {
             const mockOnFilesSelect = vi.fn();
             const mockOnRemoveFile = vi.fn();
-            const mockOnProcessModeChange = vi.fn();
 
             // Create file based on error type
             let testFile: File;
@@ -1158,12 +1105,10 @@ describe('UI Component Rendering Consistency - Property Tests', () => {
             }
 
             const { container, unmount } = render(
-              <MultiImageUpload
+              <EnhancedMultiImageUpload
                 onFilesSelect={mockOnFilesSelect}
                 selectedFiles={existingFiles}
                 onRemoveFile={mockOnRemoveFile}
-                processMode="combined"
-                onProcessModeChange={mockOnProcessModeChange}
               />
             );
 

@@ -38,3 +38,12 @@ global.IntersectionObserver = vi.fn().mockImplementation(() => ({
   unobserve: vi.fn(),
   disconnect: vi.fn(),
 }));
+
+vi.mock('@/hooks/useEnhancedToast', () => ({
+  useEnhancedToast: () => ({
+    showError: vi.fn(),
+    showWarning: vi.fn(),
+    showSuccess: vi.fn(),
+    showFileUploadError: vi.fn(),
+  }),
+}));

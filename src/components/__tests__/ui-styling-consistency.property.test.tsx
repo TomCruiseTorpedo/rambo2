@@ -17,7 +17,7 @@ import { Button } from '../ui/button';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '../ui/card';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
-import { MultiImageUpload } from '../MultiImageUpload';
+import { EnhancedMultiImageUpload } from '@/components/upload/EnhancedMultiImageUpload';
 import { TextInput } from '../TextInput';
 import { ResultsDisplay } from '../ResultsDisplay';
 
@@ -343,26 +343,22 @@ describe('UI Styling Consistency - Property Tests', () => {
               new File(['content'], `${spec.name}_2.jpg`, { type: 'image/jpeg' })
             );
 
-            // Render two MultiImageUpload components with same structure
+            // Render two EnhancedMultiImageUpload components with same structure
             const { container: container1, unmount: unmount1 } = render(
-              <MultiImageUpload
+              <EnhancedMultiImageUpload
                 onFilesSelect={() => {}}
                 selectedFiles={files1}
                 onRemoveFile={() => {}}
                 disabled={disabled}
-                processMode="combined"
-                onProcessModeChange={() => {}}
               />
             );
 
             const { container: container2, unmount: unmount2 } = render(
-              <MultiImageUpload
+              <EnhancedMultiImageUpload
                 onFilesSelect={() => {}}
                 selectedFiles={files2}
                 onRemoveFile={() => {}}
                 disabled={disabled}
-                processMode="combined"
-                onProcessModeChange={() => {}}
               />
             );
 

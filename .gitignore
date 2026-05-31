@@ -70,7 +70,10 @@ deploy_output.txt
 production_test_output.pdf
 
 # Local Development Tools (NOT for public repo)
-.beads/
+.beads/*
+!.beads/.gitignore
+!.beads/metadata.json
+!.beads/config.yaml
 .groupcode/
 group-code/
 kiro-upgrade.md
