@@ -37,6 +37,16 @@ Vendor-agnostic SR&ED narrative + T661 tooling:
 
 3. **Beads / agent memory (local only):** This is a **public** repo. Do **not** commit or push agent harness files — they are gitignored: `.cline/memory-bank/`, `.clinerules/`, `AGENTS.md`, `CLAUDE.md`, `.claude/`, `.cursor/`, `.beads/`. Copy `.env.example` → `.env` for app config. Beads (`bd`) is optional; the shipped app does not call it. If a pre-commit hook fails with `no beads database found`, run `bd init` locally or `git commit --no-verify`.
 
+   **ECC (Cursor + Claude Code):** Stand in this repo, run the installer from your ECC clone (not from rambo2):
+
+   ```sh
+   cd /path/to/rambo2
+   /path/to/ecc/install.sh --target cursor --profile core --with lang:typescript
+   /path/to/ecc/install.sh --target claude-project --profile core --with lang:typescript
+   ```
+
+   Re-run after updating ECC upstream to refresh local `.cursor/` / `.claude/`. Full notes: local `CLAUDE.md` § ECC.
+
 4. Environment variables — copy the template and fill in your values:
 
    ```sh
